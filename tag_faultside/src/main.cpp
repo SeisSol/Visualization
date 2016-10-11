@@ -167,6 +167,12 @@ int main(int argc, char* argv[])
 	double minfault = std::numeric_limits<double>::infinity();
 	double maxfault = -std::numeric_limits<double>::infinity();
 
+	double minfault2 = std::numeric_limits<double>::infinity();
+	double maxfault2 = -std::numeric_limits<double>::infinity();
+
+	double outsideborder1 = 0;
+	double outsideborder2 = 0;
+
 	for (size_t p = 0; p < partitions; p++) {
 		totalElements += elementSize[p];
 
@@ -191,15 +197,27 @@ int main(int argc, char* argv[])
 
 						minfault = std::min(minfault, point.coords[direction]);
 						maxfault = std::max(maxfault, point.coords[direction]);
+
+						if (point.coords[1-direction] < minfault2) {
+							minfault2 = point.coords[1-direction];
+							outsideborder1 = point.coords[direction];
+						}
+						if (point.coords[1-direction] > maxfault2) {
+							maxfault2 = point.coords[1-direction];
+							outsideborder2 = point.coords[direction];
+						}
 					}
 				}
 			}
 		}
 	}
 
+	logInfo() << "Cells <" << minfault2 << "and >" << maxfault2 << "have the be handled manually";
+	logInfo() << "A good choice might be" << outsideborder1 << "reps." << outsideborder2;
+
 	bool split[3] = {true, true, true};
 	split[direction] = false;
-	KDTree kdtree(faultPoints, 3, split);
+	KDTree kdtree(faultPoints, 4, split);
 
 	faultPoints.clear(); // Free memory
 
@@ -243,15 +261,25 @@ int main(int argc, char* argv[])
 				Action act;
 				kdtree.search(sup, act);
 
+				bool hasPoint = false;
+
 				for (std::vector<Point>::const_iterator it = act.points.begin();
 						it != act.points.end(); it++) {
-// 					if (it->x >= sup.limits[0][0] && it->x <= sup.limits[0][1]
-// 						&& it->z >= sup.limits[2][0] && it->z <= sup.limits[2][1]) {
+					if (it->coords[1-direction] >= sup.limits[1-direction][0] && it->coords[1-direction] <= sup.limits[1-direction][1]
+							&& it->z >= sup.limits[2][0] && it->z <= sup.limits[2][1]) {
+						hasPoint = true;
+
 						if (it->coords[direction] < avg) {
 							isLeft[globElement] = 0;
 							break;
 						}
-// 					}
+					}
+				}
+
+				if (!hasPoint) {
+					if (avg > minfault) {
+						isLeft[globElement] = 0;
+					}
 				}
 			}
 
