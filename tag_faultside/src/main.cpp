@@ -109,6 +109,8 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	const unsigned int direction = 0;
+
 	std::string mesh = args.getAdditionalArgument<const char*>("mesh");
 	std::string output = args.getAdditionalArgument<const char*>("output");
 
@@ -187,15 +189,16 @@ int main(int argc, char* argv[])
 						memcpy(point.coords, &vertexCoordinates[elementVertices[i*4 + FACE2NODES[j][k]]*3], sizeof(double)*3);
 						faultPoints.insert(point);
 
-						minfault = std::min(minfault, point.coords[1]);
-						maxfault = std::max(maxfault, point.coords[1]);
+						minfault = std::min(minfault, point.coords[direction]);
+						maxfault = std::max(maxfault, point.coords[direction]);
 					}
 				}
 			}
 		}
 	}
 
-	bool split[3] = {true, false, true};
+	bool split[3] = {true, true, true};
+	split[direction] = false;
 	KDTree kdtree(faultPoints, 3, split);
 
 	faultPoints.clear(); // Free memory
@@ -227,7 +230,7 @@ int main(int argc, char* argv[])
 				sup.limits[2][0] = std::min(sup.limits[1][0], vertexCoordinates[elementVertices[i*4+j]*3+2]);
 				sup.limits[2][1] = std::max(sup.limits[1][1], vertexCoordinates[elementVertices[i*4+j]*3+2]);
 
-				avg += vertexCoordinates[elementVertices[i*4+j]*3+1];
+				avg += vertexCoordinates[elementVertices[i*4+j]*3 + direction];
 			}
 
 			avg /= 4;
@@ -244,7 +247,7 @@ int main(int argc, char* argv[])
 						it != act.points.end(); it++) {
 // 					if (it->x >= sup.limits[0][0] && it->x <= sup.limits[0][1]
 // 						&& it->z >= sup.limits[2][0] && it->z <= sup.limits[2][1]) {
-						if (it->y < avg) {
+						if (it->coords[direction] < avg) {
 							isLeft[globElement] = 0;
 							break;
 						}
