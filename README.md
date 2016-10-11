@@ -1,0 +1,1 @@
+A collection of useful tools for visualization of [SeisSol](http://www.seissol.org)'s results.
