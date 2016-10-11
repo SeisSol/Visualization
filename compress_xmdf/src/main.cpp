@@ -53,6 +53,22 @@ static void checkH5Err(T status)
 		logError() << "An HDF5 error occurred";
 }
 
+static void compressData(unsigned int ndims, hsize_t offset[], hsize_t size[],
+	hid_t h5invar, hid_t h5inspace, hid_t h5outvar, hid_t h5outspace,
+	hid_t h5native_type, void* buffer)
+{
+	hid_t h5memspace = H5Screate_simple(ndims, size, 0L);
+	checkH5Err(h5memspace);
+
+	checkH5Err(H5Sselect_hyperslab(h5inspace, H5S_SELECT_SET, offset, 0L, size, 0L));
+	checkH5Err(H5Dread(h5invar, h5native_type, h5memspace, h5inspace, H5P_DEFAULT, buffer));
+
+	checkH5Err(H5Sselect_hyperslab(h5outspace, H5S_SELECT_SET, offset, 0L, size, 0L));
+	checkH5Err(H5Dwrite(h5outvar, h5native_type, h5memspace, h5outspace, H5P_DEFAULT, buffer));
+
+	checkH5Err(H5Sclose(h5memspace));
+}
+
 template<typename T>
 static void compressDataset(hid_t h5ifile, hid_t h5ofile,
 	const char* varname, hid_t h5native_type, hid_t h5type,
@@ -102,20 +118,79 @@ static void compressDataset(hid_t h5ifile, hid_t h5ofile,
 		if (left < chunkSize)
 			chunkSize = left;
 
-		hsize_t memDims[2] = {chunkSize, static_cast<hsize_t>(dim2)};
-		hid_t h5memspace = H5Screate_simple(ndims, memDims, 0L);
-		checkH5Err(h5memspace);
+		hsize_t offset[2] = {pos, 0};
+		hsize_t size[2] = {chunkSize, static_cast<hsize_t>(dim2)};
 
-		hsize_t selectStart[2] = {pos, 0};
-		checkH5Err(H5Sselect_hyperslab(h5ispace, H5S_SELECT_SET, selectStart, 0L, memDims, 0L));
-		checkH5Err(H5Dread(h5ivar, h5native_type, h5memspace, h5ispace, H5P_DEFAULT, buffer));
-
-		checkH5Err(H5Sselect_hyperslab(h5ospace, H5S_SELECT_SET, selectStart, 0L, memDims, 0L));
-		checkH5Err(H5Dwrite(h5ovar, h5native_type, h5memspace, h5ospace, H5P_DEFAULT, buffer));
-
-		checkH5Err(H5Sclose(h5memspace));
+		compressData(ndims, offset, size,
+			h5ivar, h5ispace, h5ovar, h5ospace,
+			h5native_type, buffer);
 
 		pos += chunkSize;
+	}
+
+	checkH5Err(H5Sclose(h5ispace));
+	checkH5Err(H5Dclose(h5ivar));
+	checkH5Err(H5Dclose(h5ovar));
+	checkH5Err(H5Sclose(h5ospace));
+}
+
+template<typename T>
+static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
+	const char* varname, hid_t h5native_type, hid_t h5type,
+	void* buffer, unsigned long bufferSize)
+{
+	// Open original var
+	hid_t h5ivar = H5Dopen(h5ifile, varname, H5P_DEFAULT);
+	checkH5Err(h5ivar);
+
+	// Get dimension information
+	hid_t h5ispace = H5Dget_space(h5ivar);
+	checkH5Err(h5ispace);
+
+	int ndims = H5Sget_simple_extent_ndims(h5ispace);
+	checkH5Err(ndims);
+	if (ndims > 2)
+		logError() << "Dimension > 1 are not supported for time datasets";
+
+	hsize_t extent[2];
+	checkH5Err(H5Sget_simple_extent_dims(h5ispace, extent, 0L));
+	hsize_t timesteps = extent[0];
+	hsize_t nelements = extent[1];
+
+	// Create new dataset
+	hsize_t chunkSize = bufferSize / sizeof(T);
+
+	hsize_t dims[2] = {timesteps, nelements}; // Change this for other elements
+	hid_t h5ospace = H5Screate_simple(ndims, dims, 0L);
+	checkH5Err(h5ospace);
+	hid_t h5opcreate = H5Pcreate(H5P_DATASET_CREATE);
+	checkH5Err(h5opcreate);
+	hsize_t chunkDims[2] = {1, std::min(chunkSize, nelements)};
+	checkH5Err(H5Pset_chunk(h5opcreate, ndims, chunkDims));
+// 	checkH5Err(H5Pset_szip(h5opcreate, H5_SZIP_NN_OPTION_MASK, 4));
+	checkH5Err(H5Pset_deflate(h5opcreate, 6));
+	hid_t h5ovar = H5Dcreate(h5ofile, varname, h5type, h5ospace,
+		H5P_DEFAULT, h5opcreate, H5P_DEFAULT);
+	checkH5Err(h5ovar);
+	checkH5Err(H5Pclose(h5opcreate));
+
+	// Transfer data
+	for (unsigned long t = 0; t < timesteps; t++) {
+		unsigned long pos = 0;
+		while (pos < nelements) {
+			const unsigned long left = nelements - pos;
+			if (left < chunkSize)
+				chunkSize = left;
+
+			hsize_t offset[2] = {t, pos};
+			hsize_t size[2] = {1, chunkSize};
+
+			compressData(ndims, offset, size,
+				h5ivar, h5ispace, h5ovar, h5ospace,
+				h5native_type, buffer);
+
+			pos += chunkSize;
+		}
 	}
 
 	checkH5Err(H5Sclose(h5ispace));
@@ -203,7 +278,7 @@ int main(int argc, char* argv[])
 
 	for (unsigned int i = 3; i < 12; i++) {
 		logInfo() << "Compressing" << utils::nospace << &varnames[i][1] << "...";
-		compressDataset<float>(h5ifile, h5ofile,
+		compressTimeDataset<float>(h5ifile, h5ofile,
 			varnames[i], H5T_NATIVE_FLOAT, H5T_IEEE_F32LE,
 			buffer, bufferSize);
 	}
