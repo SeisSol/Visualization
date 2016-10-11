@@ -162,6 +162,9 @@ int main(int argc, char* argv[])
 
 	unsigned long totalElements = 0;
 
+	double minfault = std::numeric_limits<double>::infinity();
+	double maxfault = -std::numeric_limits<double>::infinity();
+
 	for (size_t p = 0; p < partitions; p++) {
 		totalElements += elementSize[p];
 
@@ -183,6 +186,9 @@ int main(int argc, char* argv[])
 						Point point;
 						memcpy(point.coords, &vertexCoordinates[elementVertices[i*4 + FACE2NODES[j][k]]*3], sizeof(double)*3);
 						faultPoints.insert(point);
+
+						minfault = std::min(minfault, point.coords[1]);
+						maxfault = std::max(maxfault, point.coords[1]);
 					}
 				}
 			}
@@ -226,18 +232,24 @@ int main(int argc, char* argv[])
 
 			avg /= 4;
 
-			Action act;
-			kdtree.search(sup, act);
+			if (avg < minfault) {
+				// Do nothing
+			} else if (avg > maxfault) {
+				isLeft[globElement] = 0;
+			} else {
+				Action act;
+				kdtree.search(sup, act);
 
-			for (std::vector<Point>::const_iterator it = act.points.begin();
-					it != act.points.end(); it++) {
-// 				if (it->x >= sup.limits[0][0] && it->x <= sup.limits[0][1]
-// 					&& it->z >= sup.limits[2][0] && it->z <= sup.limits[2][1]) {
-					if (it->y < avg) {
-						isLeft[globElement] = 0;
-						break;
-					}
-// 				}
+				for (std::vector<Point>::const_iterator it = act.points.begin();
+						it != act.points.end(); it++) {
+// 					if (it->x >= sup.limits[0][0] && it->x <= sup.limits[0][1]
+// 						&& it->z >= sup.limits[2][0] && it->z <= sup.limits[2][1]) {
+						if (it->y < avg) {
+							isLeft[globElement] = 0;
+							break;
+						}
+// 					}
+				}
 			}
 
 			globElement++;
@@ -276,7 +288,7 @@ int main(int argc, char* argv[])
 	} else {
 		// Create new dataset
 		hsize_t dim = totalElements;
-		hid_t h5space = H5Screate_simple(1, &dim, 0L);
+		h5space = H5Screate_simple(1, &dim, 0L);
 		checkH5Err(h5space);
 		hid_t h5pcreate = H5Pcreate(H5P_DATASET_CREATE);
 		checkH5Err(h5pcreate);
@@ -284,7 +296,7 @@ int main(int argc, char* argv[])
 		checkH5Err(H5Pset_chunk(h5pcreate, 1, &chunkDim));
 // 		checkH5Err(H5Pset_szip(h5pcreate, H5_SZIP_NN_OPTION_MASK, 4));
 		checkH5Err(H5Pset_deflate(h5pcreate, 5));
-		hid_t h5var = H5Dcreate(h5File, "/is_left", H5T_STD_U32LE, h5space,
+		h5var = H5Dcreate(h5File, "/is_left", H5T_STD_U32LE, h5space,
 			H5P_DEFAULT, h5pcreate, H5P_DEFAULT);
 		checkH5Err(h5var);
 		checkH5Err(H5Pclose(h5pcreate));
