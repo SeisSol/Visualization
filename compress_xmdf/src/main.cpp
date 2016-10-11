@@ -72,7 +72,7 @@ static void compressData(unsigned int ndims, hsize_t offset[], hsize_t size[],
 template<typename T>
 static void compressDataset(hid_t h5ifile, hid_t h5ofile,
 	const char* varname, hid_t h5native_type, hid_t h5type,
-	void* buffer, unsigned long bufferSize)
+	unsigned int compressionLevel, void* buffer, unsigned long bufferSize)
 {
 	// Open original var
 	hid_t h5ivar = H5Dopen(h5ifile, varname, H5P_DEFAULT);
@@ -105,7 +105,7 @@ static void compressDataset(hid_t h5ifile, hid_t h5ofile,
 	hsize_t chunkDims[2] = {std::min(chunkSize, nelements), dim2};
 	checkH5Err(H5Pset_chunk(h5opcreate, ndims, chunkDims));
 // 	checkH5Err(H5Pset_szip(h5opcreate, H5_SZIP_NN_OPTION_MASK, 4));
-	checkH5Err(H5Pset_deflate(h5opcreate, 6));
+	checkH5Err(H5Pset_deflate(h5opcreate, compressionLevel));
 	hid_t h5ovar = H5Dcreate(h5ofile, varname, h5type, h5ospace,
 		H5P_DEFAULT, h5opcreate, H5P_DEFAULT);
 	checkH5Err(h5ovar);
@@ -137,7 +137,7 @@ static void compressDataset(hid_t h5ifile, hid_t h5ofile,
 template<typename T>
 static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 	const char* varname, hid_t h5native_type, hid_t h5type,
-	void* buffer, unsigned long bufferSize)
+	unsigned int compressionLevel, void* buffer, unsigned long bufferSize)
 {
 	// Open original var
 	hid_t h5ivar = H5Dopen(h5ifile, varname, H5P_DEFAULT);
@@ -158,7 +158,7 @@ static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 	hsize_t nelements = extent[1];
 
 	// Create new dataset
-	hsize_t chunkSize = bufferSize / sizeof(T);
+	const hsize_t chunkSize = bufferSize / sizeof(T);
 
 	hsize_t dims[2] = {timesteps, nelements}; // Change this for other elements
 	hid_t h5ospace = H5Screate_simple(ndims, dims, 0L);
@@ -168,7 +168,7 @@ static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 	hsize_t chunkDims[2] = {1, std::min(chunkSize, nelements)};
 	checkH5Err(H5Pset_chunk(h5opcreate, ndims, chunkDims));
 // 	checkH5Err(H5Pset_szip(h5opcreate, H5_SZIP_NN_OPTION_MASK, 4));
-	checkH5Err(H5Pset_deflate(h5opcreate, 6));
+	checkH5Err(H5Pset_deflate(h5opcreate, compressionLevel));
 	hid_t h5ovar = H5Dcreate(h5ofile, varname, h5type, h5ospace,
 		H5P_DEFAULT, h5opcreate, H5P_DEFAULT);
 	checkH5Err(h5ovar);
@@ -179,11 +179,13 @@ static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 		unsigned long pos = 0;
 		while (pos < nelements) {
 			const unsigned long left = nelements - pos;
-			if (left < chunkSize)
-				chunkSize = left;
+			hsize_t tmpChunkSize = chunkSize;
+
+			if (left < tmpChunkSize)
+				tmpChunkSize = left;
 
 			hsize_t offset[2] = {t, pos};
-			hsize_t size[2] = {1, chunkSize};
+			hsize_t size[2] = {1, tmpChunkSize};
 
 			compressData(ndims, offset, size,
 				h5ivar, h5ispace, h5ovar, h5ospace,
@@ -202,6 +204,7 @@ static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 int main(int argc, char* argv[])
 {
 	utils::Args args;
+	args.addOption("level", 'l', "gzip compressen level [0-9]", utils::Args::Required, false);
 	args.addAdditionalOption("input", "input file");
 	args.addAdditionalOption("output", "output file", false);
 
@@ -221,6 +224,8 @@ int main(int argc, char* argv[])
 		utils::StringUtils::replaceLast(output, ".h5", "");
 		output += "_compressed.h5";
 	}
+
+	unsigned int compressionLevel = args.getArgument<unsigned int>("level", 5);
 
 	hid_t h5ifile = H5Fopen(input.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 	checkH5Err(h5ifile);
@@ -262,25 +267,25 @@ int main(int argc, char* argv[])
 	logInfo() << "Compressing connectivity...";
 	compressDataset<unsigned long>(h5ifile, h5ofile,
 		varnames[0], H5T_NATIVE_UINT64, H5T_STD_U64LE,
-		buffer, bufferSize);
+		compressionLevel, buffer, bufferSize);
 
 	// Connect
 	logInfo() << "Compressing geometry...";
 	compressDataset<float>(h5ifile, h5ofile,
 		varnames[1], H5T_NATIVE_FLOAT, H5T_IEEE_F32LE,
-		buffer, bufferSize);
+		compressionLevel, buffer, bufferSize);
 
 	// Partition
 	logInfo() << "Compressing partition...";
 	compressDataset<unsigned int>(h5ifile, h5ofile,
 		varnames[2], H5T_NATIVE_UINT32, H5T_STD_U32LE,
-		buffer, bufferSize);
+		compressionLevel, buffer, bufferSize);
 
 	for (unsigned int i = 3; i < 12; i++) {
 		logInfo() << "Compressing" << utils::nospace << &varnames[i][1] << "...";
 		compressTimeDataset<float>(h5ifile, h5ofile,
 			varnames[i], H5T_NATIVE_FLOAT, H5T_IEEE_F32LE,
-			buffer, bufferSize);
+			compressionLevel, buffer, bufferSize);
 	}
 
 	checkH5Err(H5Fclose(h5ifile));
