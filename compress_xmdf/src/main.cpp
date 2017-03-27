@@ -5,7 +5,7 @@
  * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de, http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
  *
  * @section LICENSE
- * Copyright (c) 2016, SeisSol Group
+ * Copyright (c) 2016-2017, SeisSol Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,12 +46,8 @@
 #include "utils/logger.h"
 #include "utils/stringutils.h"
 
-template<typename T>
-static void checkH5Err(T status)
-{
-	if (status < 0)
-		logError() << "An HDF5 error occurred";
-}
+#include "hdf5_helper.h"
+#include "input.h"
 
 static void compressData(unsigned int ndims, hsize_t offset[], hsize_t size[],
 	hid_t h5invar, hid_t h5inspace, hid_t h5outvar, hid_t h5outspace,
@@ -204,6 +200,7 @@ static void compressTimeDataset(hid_t h5ifile, hid_t h5ofile,
 int main(int argc, char* argv[])
 {
 	utils::Args args;
+	args.addOption("binary", 'b', "assume binary XDMF file", utils::Args::No, false);
 	args.addOption("level", 'l', "gzip compressen level [0-9]", utils::Args::Required, false);
 	args.addAdditionalOption("input", "input file");
 	args.addAdditionalOption("output", "output file", false);
@@ -216,80 +213,74 @@ int main(int argc, char* argv[])
 	}
 
 	std::string input = args.getAdditionalArgument<const char*>("input");
+
+	bool binary = args.isSet("binary");
+	if (!binary && utils::StringUtils::endsWith(input, ".h5"))
+		utils::StringUtils::replaceLast(input, ".h5", ".xdmf");
+
 	std::string output;
 	if (args.isSetAdditional("output"))
 		output = args.getAdditionalArgument<const char*>("output");
 	else {
 		output = input;
-		utils::StringUtils::replaceLast(output, ".h5", "");
+		utils::StringUtils::replaceLast(output, ".xdmf", "");
 		output += "_compressed.h5";
 	}
 
 	unsigned int compressionLevel = args.getArgument<unsigned int>("level", 5);
 
-	hid_t h5ifile = H5Fopen(input.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-	checkH5Err(h5ifile);
+	Input* inputHandle = 0L;
+	if (binary)
+		inputHandle = new BinaryInput(input);
+	else
+		inputHandle = new HDF5Input(input);
 
-	const char* varnames[] = {
-		"/connect", "/geometry", "/partition",
-		"/sigma_xx", "/sigma_yy", "/sigma_zz",
-		"/sigma_xy", "/sigma_yz", "/sigma_xz",
-		"/u", "/v", "/w"
-	};
+	std::vector<Variable> variables = inputHandle->getVarList();
 
-	// Get the size
-	hid_t h5ivar = H5Dopen(h5ifile, varnames[0], H5P_DEFAULT);
-	checkH5Err(h5ivar);
-	hid_t h5ispace = H5Dget_space(h5ivar);
-	checkH5Err(h5ispace);
-	hsize_t extent[2];
-	checkH5Err(H5Sget_simple_extent_dims(h5ispace, extent, 0L));
-	unsigned long numElements = extent[0];
-	checkH5Err(H5Sclose(h5ispace));
-	checkH5Err(H5Dclose(h5ivar));
-
-	h5ivar = H5Dopen(h5ifile, varnames[1], H5P_DEFAULT);
-	h5ispace = H5Dget_space(h5ivar);
-	checkH5Err(H5Sget_simple_extent_dims(h5ispace, extent, 0L));
-	unsigned long numVertices = extent[0];
-	checkH5Err(H5Sclose(h5ispace));
-	checkH5Err(H5Dclose(h5ivar));
-
-	logInfo() << "Found dataset with" << numElements << "elements and" << numVertices << "vertices";
-
-	const unsigned long bufferSize = 256*1024*1024;
-	char* buffer = new char[bufferSize];
+	logInfo() << "Found dataset with" << inputHandle->numElements() << "elements and"
+		<< inputHandle->numVertices() << "vertices";
 
 	hid_t h5ofile = H5Fcreate(output.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 	checkH5Err(h5ofile);
-
-	// Connect
-	logInfo() << "Compressing connectivity...";
-	compressDataset<unsigned long>(h5ifile, h5ofile,
-		varnames[0], H5T_NATIVE_UINT64, H5T_STD_U64LE,
-		compressionLevel, buffer, bufferSize);
-
-	// Connect
-	logInfo() << "Compressing geometry...";
-	compressDataset<float>(h5ifile, h5ofile,
-		varnames[1], H5T_NATIVE_FLOAT, H5T_IEEE_F32LE,
-		compressionLevel, buffer, bufferSize);
-
-	// Partition
-	logInfo() << "Compressing partition...";
-	compressDataset<unsigned int>(h5ifile, h5ofile,
-		varnames[2], H5T_NATIVE_UINT32, H5T_STD_U32LE,
-		compressionLevel, buffer, bufferSize);
-
-	for (unsigned int i = 3; i < 12; i++) {
-		logInfo() << "Compressing" << utils::nospace << &varnames[i][1] << "...";
-		compressTimeDataset<float>(h5ifile, h5ofile,
-			varnames[i], H5T_NATIVE_FLOAT, H5T_IEEE_F32LE,
-			compressionLevel, buffer, bufferSize);
+	
+	for (std::vector<Variable>::const_iterator it = variables.begin();
+			it != variables.end(); ++it) {
+		size_t numElements = inputHandle->numElements();
+		hid_t type;
+		hid_t nativeType;
+		unsigned dim2 = 0;
+		bool isVertex = false;
+	
+		if (it->name == "connect") {
+			logInfo() << "Compressing connectivity...";
+			type = H5T_STD_U64LE;
+			nativeType = H5T_NATIVE_UINT64;
+			dim2 = inputHandle->verticesPerElement();
+		} else if (it->name == "geometry") {
+			logInfo() << "Compressing geometry...";
+			numElements = inputHandle->numVertices();
+			type = H5T_IEEE_F32LE;
+			nativeType = H5T_NATIVE_FLOAT;
+			dim2 = 3;
+			isVertex = true;
+		} else if (it->name == "partition") {
+			logInfo() << "Compressing partition...";
+			type = H5T_STD_U32LE;
+			nativeType = H5T_NATIVE_UINT32;
+		} else {
+			logInfo() << "Compressing" << utils::nospace << it->name.c_str() << "...";
+			type = H5T_IEEE_F32LE;
+			nativeType = H5T_NATIVE_FLOAT;
+		}
+		
+		OutputVar writer(h5ofile, it->name.c_str(), type, it->timesteps, numElements, dim2,
+			compressionLevel);
+		inputHandle->writeVariable(*it, nativeType, isVertex, writer);
 	}
-
-	checkH5Err(H5Fclose(h5ifile));
+	
 	checkH5Err(H5Fclose(h5ofile));
+
+	delete inputHandle;
 
 	return 0;
 }

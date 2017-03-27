@@ -47,6 +47,9 @@ vars = utils.variables.Variables()
 # Add prefix path variable
 vars.AddPrefixPathVariable()
 
+# Add support for compiler
+vars.AddCompilerVariable()
+
 env = Environment(variables=vars)
 env['ENV'] = os.environ
 
@@ -55,6 +58,9 @@ vars.SetHelpText(env)
 
 # Set prefix pathes from user
 vars.SetPrefixPathes(env)
+
+# Set compiler
+vars.SetCompiler(env)
 
 # Add HDF5
 libs.find(env, 'hdf5')
