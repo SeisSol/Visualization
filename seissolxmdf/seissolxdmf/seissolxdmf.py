@@ -165,7 +165,12 @@ def ReadNElements(xdmfFilename):
     tree = ET.parse(xdmfFilename)
     root = tree.getroot()
     for Property in root.findall("Domain/Grid/Grid/Topology"):
-        return int(Property.get("NumberOfElements"))
+        path = Property.get("Reference")
+        if path is None:
+            return int(Property.get("NumberOfElements"))
+        else:
+            ref = tree.xpath(path)[0]
+            return int(ref.get("NumberOfElements"))
     raise NameError("nElements could not be determined")
 
 
