@@ -129,7 +129,7 @@ def ReadTopologyOrGeometry(xdmfFilename, attribute):
     isInt = True if attribute == "Topology" else False
     if isHdf5:
         filename, hdf5var = splitArgs
-        myData = ReadHdf5datasetChunk(path + filename, hdf5var, 0, dim2)
+        myData = ReadHdf5DatasetChunk(path + filename, hdf5var, 0, dim2)
     else:
         myData = ReadSimpleBinaryFile(path + dataLocation, dim2, data_prec, isInt)
         myData = myData.reshape((nElements, dim2))
@@ -197,7 +197,7 @@ def Read1dData(xdmfFilename, dataName, nElements, isInt=False):
     isHdf5 = True if len(splitArgs) == 2 else False
     if isHdf5:
         filename, hdf5var = splitArgs
-        myData = ReadHdf5datasetChunk(path + filename, hdf5var, 0, MemDimension)
+        myData = ReadHdf5DatasetChunk(path + filename, hdf5var, 0, MemDimension)
     else:
         filename = dataLocation
         myData = ReadSimpleBinaryFile(path + dataLocation, nElements, data_prec, isInt)
@@ -233,7 +233,7 @@ def ReadDataChunk(xdmfFilename, dataName, firstElement, nchunk, idt=-1):
     oneDtMem = True if idt != -1 else False
     if isHdf5:
         filename, hdf5var = splitArgs
-        myData = ReadHdf5datasetChunk(path + filename, hdf5var, idt)
+        myData = ReadHdf5DatasetChunk(path + filename, hdf5var, firstElement, nchunk, idt)
     else:
         ndt = ReadNdt(xdmfFilename)
         myData = ReadSimpleBinaryFileChunk(path + dataLocation, MemDimension, data_prec, isInt=False, ndt=ndt, firstElement=firstElement, nchunk=nchunk, idt=idt)

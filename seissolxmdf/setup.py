@@ -1,11 +1,22 @@
 import setuptools
+import re
+
+
+def get_property(prop, project):
+    # https://stackoverflow.com/questions/17791481/creating-a-version-attribute-for-python-packages-without-getting-into-troubl/41110107
+    result = re.search(
+        r'{}\s*=\s*[\'"]([^\'"]*)[\'"]'.format(prop), open(project + "/__init__.py").read()
+    )
+    return result.group(1)
+
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+project_name = "seissolxdmf"
 setuptools.setup(
-    name="seissolxmdf", 
-    version="0.0.2",
+    name=project_name,
+    version=get_property("__version__", project_name),
     author="SeisSol Group",
     description="A python reader for SeisSol xdmf output",
     long_description=long_description,
@@ -17,5 +28,5 @@ setuptools.setup(
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
 )
