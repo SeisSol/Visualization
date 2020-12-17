@@ -65,6 +65,7 @@ def ReadSimpleBinaryFileChunk(absolute_path, MemDimension, data_prec, isInt, ndt
 
     fid = open(absolute_path, "r")
     if oneDtMem:
+        assert idt < ndt
         fid.seek((idt * MemDimension + firstElement) * data_prec, os.SEEK_SET)
         myData = np.fromfile(fid, dtype=data_type, count=nchunk)
     else:
@@ -132,7 +133,8 @@ def ReadTopologyOrGeometry(xdmfFilename, attribute):
         myData = ReadHdf5DatasetChunk(path + filename, hdf5var, 0, dim2)
     else:
         myData = ReadSimpleBinaryFile(path + dataLocation, dim2, data_prec, isInt)
-        myData = myData.reshape((nElements, dim2))
+        # due to zero padding in SeisSol for memory alignement, the array read may be larger than the actual data
+        myData = myData[0:nElements, :]
     return myData
 
 
