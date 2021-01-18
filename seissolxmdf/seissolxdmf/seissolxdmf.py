@@ -159,13 +159,15 @@ class seissolxdmf:
     def ReadNElements(self):
         """ read number of cell elements of the mesh """
         root = self.tree.getroot()
-        for Property in root.findall("Domain/Grid/Grid/Topology"):
-            path = Property.get("Reference")
-            if path is None:
-                return int(Property.get("NumberOfElements"))
-            else:
-                ref = tree.xpath(path)[0]
-                return int(ref.get("NumberOfElements"))
+        list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
+        for location in list_possible_location:
+            for Property in root.findall(location):
+                path = Property.get("Reference")
+                if path is None:
+                    return int(Property.get("NumberOfElements"))
+                else:
+                    ref = tree.xpath(path)[0]
+                    return int(ref.get("NumberOfElements"))
         raise NameError("nElements could not be determined")
 
     def ReadTimeStep(self):
