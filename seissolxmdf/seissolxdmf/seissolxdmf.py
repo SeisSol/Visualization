@@ -1,14 +1,7 @@
 import numpy as np
 import os
 
-import importlib.util
-lxml_spec = importlib.util.find_spec('lxml')
-etree_spec = importlib.util.find_spec('lxml.etree') if lxml_spec else None
-if etree_spec:
-    ET = etree_spec.loader.load_module()
-else:
-    ET = importlib.util.find_spec('xml.etree.ElementTree').loader.load_module()
-
+import xml.etree.ElementTree as ET
 
 class seissolxdmf:
     def __init__(self, xdmfFilename):
