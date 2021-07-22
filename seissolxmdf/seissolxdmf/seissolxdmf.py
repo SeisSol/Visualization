@@ -1,7 +1,7 @@
 import numpy as np
 import os
-import lxml.etree as ET
 
+import xml.etree.ElementTree as ET
 
 class seissolxdmf:
     def __init__(self, xdmfFilename):
