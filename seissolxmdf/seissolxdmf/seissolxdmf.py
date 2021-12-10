@@ -1,12 +1,24 @@
 import numpy as np
 import os
-
 import xml.etree.ElementTree as ET
+
+def find_line_number_endtag_xdmf(alines):
+    for n, line in enumerate(alines):
+       if '</Xdmf>' in line:
+          return n + 1
+    raise ValueError("</Xdmf> not found")
 
 class seissolxdmf:
     def __init__(self, xdmfFilename):
         self.xdmfFilename = xdmfFilename
-        self.tree = ET.parse(xdmfFilename)
+        with open (xdmfFilename, "r") as fid:
+            lines=fid.readlines()
+        # Remove potential extra content at the end of the file
+        nlines = find_line_number_endtag_xdmf(lines)
+        if nlines!=len(lines):
+            print(f'Warning: extra content at the end of {xdmfFilename} detected')
+        file_txt = ' '.join([line for line in lines[0:nlines]])
+        self.tree = ET.ElementTree(ET.fromstring(file_txt))
         self.ndt = self.ReadNdt()
         self.nElements = self.ReadNElements()
 
