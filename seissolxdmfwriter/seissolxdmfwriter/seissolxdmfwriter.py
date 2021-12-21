@@ -59,7 +59,7 @@ def write_seissol_h5(prefix, lDataName, xyz, connect, lData, lidt, reduce_precis
             mydtype = dtypeDict[lData[k].dtype.name]
             if reduce_precision:
                 mydtype = reducePrecisionDict[mydtype]
-            h5f.create_dataset(hdname, (nCells), dtype=mydtype)
+            h5f.create_dataset(hdname, (nCells,), dtype=str(mydtype))
             if len(lData[0].shape) == 1 and len(lidt) == 1:
                 h5f[hdname][:] = lData[k][:]
             else:
