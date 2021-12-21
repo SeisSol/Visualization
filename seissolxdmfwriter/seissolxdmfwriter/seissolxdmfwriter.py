@@ -1,5 +1,5 @@
 import h5py
-
+import numpy as np
 
 def write_seissol_xdmf(
     prefix, nNodes, nCells, lDataName, dt, node_per_element, lidt, precision
@@ -15,10 +15,10 @@ def write_seissol_xdmf(
   <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
    <Grid Name="step_{idt}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
-     <DataItem NumberType="Int" Precision="8" Format="HDF" Dimensions="{nCells} {node_per_element}">{prefix}.h5:/mesh0/connect</DataItem>
+     <DataItem NumberType="Int" Precision="8" Format="HDF" Dimensions="{nCells} {node_per_element}">{prefix}.h5:/connect</DataItem>
     </Topology>
     <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
-     <DataItem NumberType="Float" Precision="8" Format="HDF" Dimensions="{nNodes} 3">{prefix}.h5:/mesh0/geometry</DataItem>
+     <DataItem NumberType="Float" Precision="8" Format="HDF" Dimensions="{nNodes} 3">{prefix}.h5:/geometry</DataItem>
     </Geometry>
     <Time Value="{idt*dt}"/>"""
         for dataName in lDataName:
@@ -26,7 +26,7 @@ def write_seissol_xdmf(
     <Attribute Name="{dataName}" Center="Cell">
      <DataItem ItemType="HyperSlab" Dimensions="{nCells}">
       <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">{i} 0 1 1 1 {nCells}</DataItem>
-      <DataItem NumberType="Float" Precision="{prec}" Format="HDF" Dimensions="{i+1} {nCells}">{prefix}.h5:/mesh0/{dataName}</DataItem>
+      <DataItem NumberType="Float" Precision="{prec}" Format="HDF" Dimensions="{i+1} {nCells}">{prefix}.h5:/{dataName}</DataItem>
      </DataItem>
     </Attribute>"""
         xdmf += """
@@ -42,18 +42,18 @@ def write_seissol_xdmf(
 
 
 def write_seissol_h5(prefix, lDataName, xyz, connect, lData, lidt, precision):
-    myDtype = "float64" if precision == "double" else "float32"
+    dtypeDict = {"int64": "i8", "int32": "i4", "float64": "float64", "float32": "float32"}
     nCells, node_per_element = connect.shape
     with h5py.File(prefix + ".h5", "w") as h5f:
-        h5f.create_dataset("mesh0/connect", (nCells, node_per_element), dtype="i8")
-        h5f["mesh0/connect"][:, :] = connect[:, :]
-        h5f.create_dataset("mesh0/geometry", xyz.shape, dtype="d")
-        h5f["mesh0/geometry"][:, :] = xyz[:, :]
+        h5f.create_dataset("/connect", (nCells, node_per_element), dtype="uint64")
+        h5f["/connect"][:, :] = connect[:, :]
+        h5f.create_dataset("/geometry", xyz.shape, dtype="d")
+        h5f["/geometry"][:, :] = xyz[:, :]
         for k, dataName in enumerate(lDataName):
-            hdname = "mesh0/" + dataName
-            h5f.create_dataset(hdname, (len(lidt), nCells), dtype=myDtype)
+            hdname = "/" + dataName
+            h5f.create_dataset(hdname, (nCells), dtype=dtypeDict[lData[k].dtype.name])
             if len(lData[0].shape) == 1 and len(lidt) == 1:
-                h5f[hdname][0, :] = lData[k][:]
+                h5f[hdname][:] = lData[k][:]
             else:
                 for i, idt in enumerate(lidt):
                     h5f[hdname][i, :] = lData[k][idt, :]
