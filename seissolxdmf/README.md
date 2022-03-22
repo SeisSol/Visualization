@@ -18,6 +18,8 @@ geom = sx.ReadGeometry()
 # load connectivity array as a numpy array of shape ((nElements, 3 or 4))
 # The connectivity array gives for each cell a list of vertex ids.
 connect = sx.ReadConnect()
+# Check, whether variable "SRs" exists in the SeisSol output
+assert "SRs" in sx.ReadAvailableDataFields()
 # load SRs as a numpy array of shape ((ndt, nElements))
 SRs = sx.ReadData('SRs')
 # load the 8th time ste of the SRs array as a numpy array of shape (nElements)
