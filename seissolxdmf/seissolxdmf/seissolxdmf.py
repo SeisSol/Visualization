@@ -182,6 +182,14 @@ class seissolxdmf:
                     return int(ref.get("NumberOfElements"))
         raise NameError("nElements could not be determined")
 
+    def ReadAvailableDataFields(self):
+        """ read all available data fields, e.g. SRs or P_n """
+        root = self.tree.getroot()
+        availableDataFields = set()
+        for Property in root.findall(".//Attribute"):
+            availableDataFields.add(Property.get("Name"))
+        return availableDataFields
+
     def ReadTimeStep(self):
         """ reading the time step (dt) in the xdmf file """
         root = self.tree.getroot()
