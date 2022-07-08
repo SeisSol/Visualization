@@ -21,7 +21,7 @@ setuptools.setup(
     description="A python reader for SeisSol xdmf output",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/SeisSol/Visualization/seissolxmdf",
+    url="https://github.com/SeisSol/Visualization/seissolxdmf",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
