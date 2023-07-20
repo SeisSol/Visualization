@@ -22,6 +22,6 @@ connect = sx.ReadConnect()
 assert "SRs" in sx.ReadAvailableDataFields()
 # load SRs as a numpy array of shape ((ndt, nElements))
 SRs = sx.ReadData('SRs')
-# load the 8th time ste of the SRs array as a numpy array of shape (nElements)
+# load the 9th time step of the SRs array as a numpy array of shape (nElements)
 SRs = sx.ReadData('SRs', 8)
 ```
