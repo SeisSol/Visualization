@@ -147,7 +147,7 @@ def write_seissol_output(
     """
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
-    if len(lidt) == 1:
+    if dt == 0.0:
         write_mesh_xdmf(
             prefix, nNodes, nCells, lDataName, lData, node_per_element, reduce_precision
         )
