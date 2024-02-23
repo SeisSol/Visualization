@@ -4,13 +4,10 @@ import os
 
 def write_timeseries_xdmf(
     prefix,
-    nNodes,
-    nCells,
-    lDataName,
-    lData,
-    dt,
-    node_per_element,
-    lidt,
+    xyz,
+    connect,
+    dictData,
+    dictTime,
     reduce_precision,
     to_hdf5,
 ):
@@ -30,22 +27,27 @@ def write_timeseries_xdmf(
         ext = ".bin"
         data_format = "Binary"
 
+    nNodes = xyz.shape[0]
+    nCells, node_per_element = connect.shape
+    lDataName = list(dictData.keys())
+    lData = list(dictData.values())
     topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
     xdmf = """<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
-    for i, idt in enumerate(lidt):
+    for i, ctime in enumerate(list(dictTime.keys())):
+        index = dictTime[ctime]
         xdmf += f"""
   <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
-   <Grid Name="step_{idt}" GridType="Uniform">
+   <Grid Name="step_{index}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
      <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{prefix}{colon_or_nothing}/connect{ext}</DataItem>
     </Topology>
     <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
      <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{prefix}{colon_or_nothing}/geometry{ext}</DataItem>
     </Geometry>
-    <Time Value="{idt*dt}"/>"""
+    <Time Value="{ctime}"/>"""
         for k, dataName in enumerate(lDataName):
             prec = 4 if reduce_precision else precisionDict[lData[k].dtype.name]
             number_type = numberTypeDict[lData[k].dtype.name]
@@ -70,11 +72,9 @@ def write_timeseries_xdmf(
 
 def write_mesh_xdmf(
     prefix,
-    nNodes,
-    nCells,
-    lDataName,
-    lData,
-    node_per_element,
+    xyz,
+    connect,
+    dictData,
     reduce_precision,
     to_hdf5,
 ):
@@ -94,6 +94,11 @@ def write_mesh_xdmf(
         colon_or_nothing = ""
         ext = ".bin"
         data_format = "Binary"
+
+    nNodes = xyz.shape[0]
+    nCells, node_per_element = connect.shape
+    lDataName = list(dictData.keys())
+    lData = list(dictData.values())
 
     xdmf = f"""<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
@@ -124,9 +129,7 @@ def write_mesh_xdmf(
     print(f"done writing {prefix}.xdmf")
 
 
-def write_binaries(
-    prefix, lDataName, xyz, connect, lData, lidt, reduce_precision, to_hdf5
-):
+def write_binaries(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5):
     dtypeDict = {
         "int64": "i8",
         "int32": "i4",
@@ -140,6 +143,9 @@ def write_binaries(
         "float32": "float32",
     }
     nCells, node_per_element = connect.shape
+    lDataName = list(dictData.keys())
+    lData = list(dictData.values())
+
     if to_hdf5:
         import h5py
 
@@ -153,12 +159,14 @@ def write_binaries(
                 mydtype = dtypeDict[lData[k].dtype.name]
                 if reduce_precision:
                     mydtype = reducePrecisionDict[mydtype]
-                if len(lData[0].shape) == 1 and len(lidt) == 1:
+                if len(lData[0].shape) == 1 and len(dictTime) <= 1:
                     h5f.create_dataset(hdname, (nCells,), dtype=str(mydtype))
                     h5f[hdname][:] = lData[k][:]
                 else:
-                    h5f.create_dataset(hdname, (len(lidt), nCells), dtype=str(mydtype))
-                    for i, idt in enumerate(lidt):
+                    h5f.create_dataset(
+                        hdname, (len(dictTime), nCells), dtype=str(mydtype)
+                    )
+                    for i, idt in enumerate(list(dictTime.values())):
                         h5f[hdname][i, :] = lData[k][idt, :]
         print(f"done writing {prefix}.h5")
     else:
@@ -172,7 +180,11 @@ def write_binaries(
             if reduce_precision:
                 mydtype = reducePrecisionDict[mydtype]
             with open(f"{prefix}/{dataName}.bin", "wb") as fid:
-                lData[k].astype(mydtype).tofile(fid)
+                if not dictTime:
+                    lData[k][:].astype(mydtype).tofile(fid)
+                else:
+                    for i, idt in enumerate(list(dictTime.values())):
+                        lData[k][idt, :].astype(mydtype).tofile(fid)
         print(f"done writing binary files in {prefix}")
 
 
@@ -198,32 +210,61 @@ def write_seissol_output(
     lidt: list of time steps to be written
     reduce_precision: convert double to float and i64 to i32 if True
     """
+    print("Warning: write_seissol_output is deprecated. Please use write instead")
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
-    if dt == 0.0:
+    dictData = {}
+    for name, value in zip(lDataName, lData):
+        dictData[name] = value
+    dictTime = {}
+    if dt:
+        for index in lidt:
+            dictTime[dt * index] = index
+    print(dictData)
+    print(dictTime)
+    if dt == 0:
+        lTime = [-1.0]
+    write(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5)
+
+
+def write(
+    prefix,
+    xyz,
+    connect,
+    dictData,
+    dictTime,
+    reduce_precision=False,
+    to_hdf5=True,
+):
+    """
+    Write hdf5/xdmf files output, readable by ParaView using SeisSol data
+    prefix: file
+    xyz: geometry array
+    connect: connect array
+    dictData: dictionnary with dataname as keys and numpy arrays as values
+    dictTime: dictionnary with time values as keys and indices as values.
+               for writing a puml mesh use an empty dictionnary
+    reduce_precision: convert double to float and i64 to i32 if True
+    """
+    nNodes = xyz.shape[0]
+    nCells, node_per_element = connect.shape
+    if not dictTime:
         write_mesh_xdmf(
             prefix,
-            nNodes,
-            nCells,
-            lDataName,
-            lData,
-            node_per_element,
+            xyz,
+            connect,
+            dictData,
             reduce_precision,
             to_hdf5,
         )
     else:
         write_timeseries_xdmf(
             prefix,
-            nNodes,
-            nCells,
-            lDataName,
-            lData,
-            dt,
-            node_per_element,
-            lidt,
+            xyz,
+            connect,
+            dictData,
+            dictTime,
             reduce_precision,
             to_hdf5,
         )
-    write_binaries(
-        prefix, lDataName, xyz, connect, lData, lidt, reduce_precision, to_hdf5
-    )
+    write_binaries(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5)

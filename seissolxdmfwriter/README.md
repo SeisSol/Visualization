@@ -1,6 +1,6 @@
 seissolxdmfwriter
-===============
-Functions to write seissol outputs readable by paraview.
+==================
+A python module to write seissol outputs readable by paraview.
 
 ```python
 import seissolxdmfwriter as sxw
@@ -18,15 +18,15 @@ SRd = sx.ReadData("SRs")
 SR = np.sqrt(SRs**2 + SRd**2)
 
 # Write the 0,4 and 8th times steps of array SRs and SR in SRtest-fault.xdmf/SRtest-fault.h5
-sxw.write_seissol_output(
+dictTime = {dt * i: i for i in [0, 4, 8]}
+sxw.write(
     "test-fault",
     geom,
     connect,
-    ["SRs", "SR"],
-    [SRs, SR],
-    dt,
-    [0, 4, 8],
+    {"SRs": SRs, "SR": SR},
+    dictTime,
     reduce_precision=True,
     to_hdf5=True,
 )
 ```
+
