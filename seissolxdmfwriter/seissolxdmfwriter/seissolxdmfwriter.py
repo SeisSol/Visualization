@@ -213,7 +213,9 @@ def write_seissol_output(
     lidt: list of time steps to be written
     reduce_precision: convert double to float and i64 to i32 if True
     """
-    print("Warning: write_seissol_output is deprecated. Please use write instead")
+    from warnings import warn
+
+    warn("write_seissol_output is deprecated. Please use write instead")
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
     dictData = {}
