@@ -2,6 +2,16 @@ import numpy as np
 import os
 
 
+def dataLocation(prefix, name, backend):
+    if backend == "hdf5":
+        colon_or_nothing = ".h5:"
+        ext = ""
+    else:
+        colon_or_nothing = ""
+        ext = ".bin"
+    return f"{prefix}{colon_or_nothing}/{name}{ext}"
+
+
 def write_timeseries_xdmf(
     prefix,
     xyz,
@@ -9,7 +19,7 @@ def write_timeseries_xdmf(
     dictData,
     dictTime,
     reduce_precision,
-    to_hdf5,
+    backend,
 ):
     precisionDict = {"int64": 8, "int32": 4, "float64": 8, "float32": 4}
     numberTypeDict = {
@@ -18,15 +28,8 @@ def write_timeseries_xdmf(
         "float64": "Float",
         "float32": "Float",
     }
-    if to_hdf5:
-        colon_or_nothing = ".h5:"
-        ext = ""
-        data_format = "HDF"
-    else:
-        colon_or_nothing = ""
-        ext = ".bin"
-        data_format = "Binary"
 
+    data_format = "HDF" if backend == "hdf5" else "Binary"
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
     lDataName = list(dictData.keys())
@@ -36,26 +39,30 @@ def write_timeseries_xdmf(
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
+    geometry_location = dataLocation(prefix, "geometry", backend)
+    connect_location = dataLocation(prefix, "connect", backend)
+
     for i, ctime in enumerate(list(dictTime.keys())):
         index = dictTime[ctime]
         xdmf += f"""
   <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
    <Grid Name="step_{index}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
-     <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{prefix}{colon_or_nothing}/connect{ext}</DataItem>
+     <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
     </Topology>
     <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
-     <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{prefix}{colon_or_nothing}/geometry{ext}</DataItem>
+     <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
     </Geometry>
     <Time Value="{ctime}"/>"""
         for k, dataName in enumerate(lDataName):
             prec = 4 if reduce_precision else precisionDict[lData[k].dtype.name]
             number_type = numberTypeDict[lData[k].dtype.name]
+            data_location = dataLocation(prefix, dataName, backend)
             xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
      <DataItem ItemType="HyperSlab" Dimensions="{nCells}">
       <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">{i} 0 1 1 1 {nCells}</DataItem>
-      <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="{i+1} {nCells}">{prefix}{colon_or_nothing}/{dataName}{ext}</DataItem>
+      <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="{i+1} {nCells}">{data_location}</DataItem>
      </DataItem>
     </Attribute>"""
         xdmf += """
@@ -76,7 +83,7 @@ def write_mesh_xdmf(
     connect,
     dictData,
     reduce_precision,
-    to_hdf5,
+    backend,
 ):
     precisionDict = {"int64": 8, "int32": 4, "float64": 8, "float32": 4}
     numberTypeDict = {
@@ -86,19 +93,14 @@ def write_mesh_xdmf(
         "float32": "Float",
     }
     topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
-    if to_hdf5:
-        colon_or_nothing = ".h5:"
-        ext = ""
-        data_format = "HDF"
-    else:
-        colon_or_nothing = ""
-        ext = ".bin"
-        data_format = "Binary"
 
+    data_format = "HDF" if backend == "hdf5" else "Binary"
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
     lDataName = list(dictData.keys())
     lData = list(dictData.values())
+    geometry_location = dataLocation(prefix, "geometry", backend)
+    connect_location = dataLocation(prefix, "connect", backend)
 
     xdmf = f"""<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
@@ -106,17 +108,18 @@ def write_mesh_xdmf(
  <Domain>
   <Grid Name="puml mesh" GridType="Uniform">
    <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
-    <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{prefix}{colon_or_nothing}/connect{ext}</DataItem>
+    <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
    </Topology>
    <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
-    <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{prefix}.h5:/geometry</DataItem>
+    <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
    </Geometry>"""
     for k, dataName in enumerate(lDataName):
         prec = 4 if reduce_precision else precisionDict[lData[k].dtype.name]
         number_type = numberTypeDict[lData[k].dtype.name]
+        data_location = dataLocation(prefix, dataName, backend)
         xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
-      <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="1 {nCells}">{prefix}{colon_or_nothing}/{dataName}{ext}</DataItem>
+      <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="1 {nCells}">{data_location}</DataItem>
     </Attribute>"""
 
         xdmf += """
@@ -129,7 +132,7 @@ def write_mesh_xdmf(
     print(f"done writing {prefix}.xdmf")
 
 
-def write_binaries(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5):
+def write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend):
     dtypeDict = {
         "int64": "i8",
         "int32": "i4",
@@ -146,7 +149,7 @@ def write_binaries(prefix, xyz, connect, dictData, dictTime, reduce_precision, t
     lDataName = list(dictData.keys())
     lData = list(dictData.values())
 
-    if to_hdf5:
+    if backend == "hdf5":
         import h5py
 
         with h5py.File(prefix + ".h5", "w") as h5f:
@@ -197,7 +200,7 @@ def write_seissol_output(
     dt,
     lidt,
     reduce_precision=False,
-    to_hdf5=True,
+    backend="hdf5",
 ):
     """
     Write hdf5/xdmf files output, readable by ParaView using SeisSol data
@@ -224,7 +227,7 @@ def write_seissol_output(
     print(dictTime)
     if dt == 0:
         lTime = [-1.0]
-    write(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5)
+    write(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend)
 
 
 def write(
@@ -234,7 +237,7 @@ def write(
     dictData,
     dictTime,
     reduce_precision=False,
-    to_hdf5=True,
+    backend="hdf5",
 ):
     """
     Write hdf5/xdmf files output, readable by ParaView using SeisSol data
@@ -245,9 +248,13 @@ def write(
     dictTime: dictionnary with time values as keys and indices as values.
                for writing a puml mesh use an empty dictionnary
     reduce_precision: convert double to float and i64 to i32 if True
+    backend: data format ("hdf5" or "raw")
     """
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
+    if backend not in ("hdf5", "raw"):
+        raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
+
     if not dictTime:
         write_mesh_xdmf(
             prefix,
@@ -255,7 +262,7 @@ def write(
             connect,
             dictData,
             reduce_precision,
-            to_hdf5,
+            backend,
         )
     else:
         write_timeseries_xdmf(
@@ -265,6 +272,6 @@ def write(
             dictData,
             dictTime,
             reduce_precision,
-            to_hdf5,
+            backend,
         )
-    write_binaries(prefix, xyz, connect, dictData, dictTime, reduce_precision, to_hdf5)
+    write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend)

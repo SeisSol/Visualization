@@ -1,5 +1,5 @@
 seissolxdmfwriter
-==================
+=================
 A python module to write seissol outputs readable by paraview.
 
 ```python
@@ -26,7 +26,7 @@ sxw.write(
     {"SRs": SRs, "SR": SR},
     dictTime,
     reduce_precision=True,
-    to_hdf5=True,
+    backend="hdf5",
 )
 ```
 
