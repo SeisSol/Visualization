@@ -92,11 +92,11 @@ def write_mesh_xdmf(
         "float64": "Float",
         "float32": "Float",
     }
-    topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
 
     data_format = "HDF" if backend == "hdf5" else "Binary"
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
+    topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
     lDataName = list(dictData.keys())
     lData = list(dictData.values())
     geometry_location = dataLocation(prefix, "geometry", backend)
@@ -122,7 +122,7 @@ def write_mesh_xdmf(
       <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="1 {nCells}">{data_location}</DataItem>
     </Attribute>"""
 
-        xdmf += """
+    xdmf += """
   </Grid>
  </Domain>
 </Xdmf>
@@ -183,20 +183,16 @@ def write_data(
                 mydtype = dtypeDict[lData[k].dtype.name]
                 if reduce_precision:
                     mydtype = reducePrecisionDict[mydtype]
-                if len(lData[0].shape) == 1 and len(dictTime) <= 1:
-                    h5f.create_dataset(
-                        hdname, (nCells,), dtype=str(mydtype), **compression_options
-                    )
-                    h5f[hdname][:] = lData[k][:]
-                else:
-                    h5f.create_dataset(
-                        hdname,
-                        (len(dictTime), nCells),
-                        dtype=str(mydtype),
-                        **compression_options,
-                    )
-                    for i, idt in enumerate(list(dictTime.values())):
-                        h5f[hdname][i, :] = lData[k][idt, :]
+                if len(lData[k].shape) == 1:
+                    lData[k] = lData[k][np.newaxis, :]
+                h5f.create_dataset(
+                    hdname,
+                    (len(dictTime), nCells),
+                    dtype=str(mydtype),
+                    **compression_options,
+                )
+                for i, idt in enumerate(list(dictTime.values())):
+                    h5f[hdname][i, :] = lData[k][idt, :]
         print(f"done writing {prefix}.h5")
     else:
         os.makedirs(prefix, exist_ok=True)
@@ -208,6 +204,8 @@ def write_data(
             mydtype = dtypeDict[lData[k].dtype.name]
             if reduce_precision:
                 mydtype = reducePrecisionDict[mydtype]
+            if len(lData[k].shape) == 1:
+                lData[k] = lData[k][np.newaxis, :]
             with open(f"{prefix}/{dataName}.bin", "wb") as fid:
                 if not dictTime:
                     lData[k][:].astype(mydtype).tofile(fid)
@@ -251,8 +249,7 @@ def write_seissol_output(
     if dt:
         for index in lidt:
             dictTime[dt * index] = index
-    print(dictData)
-    print(dictTime)
+
     if dt == 0:
         lTime = [-1.0]
     write(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend)
@@ -285,6 +282,20 @@ def write(
         raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
         raise ValueError("compression_level has to be in 0-9")
+
+    # check that dictTime is compatible with dataArray
+    if dictTime:
+        max_index = max(dictTime.values())
+    for dataName, dataArray in dictData.items():
+        lenArray = 1 if len(dataArray.shape) == 1 else dataArray.shape[0]
+        if dictTime:
+            assert (
+                max_index < lenArray
+            ), f"max index of dictTime ({max_index}) larger than array size ({lenArray}) for array {dataName}"
+        else:
+            assert (
+                lenArray == 1
+            ), f"array size ({lenArray}) for array {dataName} is not 1 and dictTime is empty"
 
     if not dictTime:
         write_mesh_xdmf(
