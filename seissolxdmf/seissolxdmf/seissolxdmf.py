@@ -168,6 +168,14 @@ class seissolxdmf:
         else:
             return ndt
 
+    def ReadTimes(self):
+        """returns the list of output times written in the file"""
+        root = self.tree.getroot()
+        outputTimes = []
+        for Property in root.findall("Domain/Grid/Grid/Time"):
+            outputTimes.append(float(Property.get("Value")))
+        return outputTimes
+
     def ReadNElements(self):
         """ read number of cell elements of the mesh """
         root = self.tree.getroot()
