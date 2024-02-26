@@ -13,6 +13,8 @@ nElements = sx.ReadNElements()
 dt = sx.ReadTimeStep()
 # Read number of time steps
 ndt = sx.ReadNdt()
+# Returns a list of the output time values
+outputTimes = sx.ReadTimes()
 # load geometry array as a numpy array of shape ((nodes, 3))
 geom = sx.ReadGeometry()
 # load connectivity array as a numpy array of shape ((nElements, 3 or 4))
