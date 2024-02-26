@@ -132,7 +132,16 @@ def write_mesh_xdmf(
     print(f"done writing {prefix}.xdmf")
 
 
-def write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend):
+def write_data(
+    prefix,
+    xyz,
+    connect,
+    dictData,
+    dictTime,
+    reduce_precision,
+    backend,
+    compression_level,
+):
     dtypeDict = {
         "int64": "i8",
         "int32": "i4",
@@ -152,10 +161,22 @@ def write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backe
     if backend == "hdf5":
         import h5py
 
+        compression_options = {}
+        if compression_level:
+            compression_options = {
+                "compression": "gzip",
+                "compression_opts": compression_level,
+            }
+
         with h5py.File(prefix + ".h5", "w") as h5f:
-            h5f.create_dataset("/connect", (nCells, node_per_element), dtype="uint64")
+            h5f.create_dataset(
+                "/connect",
+                (nCells, node_per_element),
+                dtype="uint64",
+                **compression_options,
+            )
             h5f["/connect"][:, :] = connect[:, :]
-            h5f.create_dataset("/geometry", xyz.shape, dtype="d")
+            h5f.create_dataset("/geometry", xyz.shape, dtype="d", **compression_options)
             h5f["/geometry"][:, :] = xyz[:, :]
             for k, dataName in enumerate(lDataName):
                 hdname = "/" + dataName
@@ -163,11 +184,16 @@ def write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backe
                 if reduce_precision:
                     mydtype = reducePrecisionDict[mydtype]
                 if len(lData[0].shape) == 1 and len(dictTime) <= 1:
-                    h5f.create_dataset(hdname, (nCells,), dtype=str(mydtype))
+                    h5f.create_dataset(
+                        hdname, (nCells,), dtype=str(mydtype), **compression_options
+                    )
                     h5f[hdname][:] = lData[k][:]
                 else:
                     h5f.create_dataset(
-                        hdname, (len(dictTime), nCells), dtype=str(mydtype)
+                        hdname,
+                        (len(dictTime), nCells),
+                        dtype=str(mydtype),
+                        **compression_options,
                     )
                     for i, idt in enumerate(list(dictTime.values())):
                         h5f[hdname][i, :] = lData[k][idt, :]
@@ -240,6 +266,7 @@ def write(
     dictTime,
     reduce_precision=False,
     backend="hdf5",
+    compression_level=4,
 ):
     """
     Write hdf5/xdmf files output, readable by ParaView using SeisSol data
@@ -256,6 +283,8 @@ def write(
     nCells, node_per_element = connect.shape
     if backend not in ("hdf5", "raw"):
         raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
+    if compression_level < 0 or compression_level > 9:
+        raise ValueError("compression_level has to be in 0-9")
 
     if not dictTime:
         write_mesh_xdmf(
@@ -276,4 +305,13 @@ def write(
             reduce_precision,
             backend,
         )
-    write_data(prefix, xyz, connect, dictData, dictTime, reduce_precision, backend)
+    write_data(
+        prefix,
+        xyz,
+        connect,
+        dictData,
+        dictTime,
+        reduce_precision,
+        backend,
+        compression_level,
+    )
