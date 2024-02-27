@@ -30,5 +30,19 @@ sxw.write(
     reduce_precision=True,
     backend="hdf5",
 )
+
+# Finally, the module can be use to write data directly from seissolxdmf, limiting
+# the memory requirements
+
+sxw.write_from_seissol_output(
+    'test-fault-raw-sx',
+    fn,
+    ['SRs', 'SRd','fault-tag', 'partition'],
+    [3,4],
+    reduce_precision=True,
+    backend="hdf5",
+    compression_level=4,
+)
+
 ```
 

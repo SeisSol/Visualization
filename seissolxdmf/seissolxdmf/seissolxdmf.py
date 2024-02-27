@@ -176,19 +176,35 @@ class seissolxdmf:
             outputTimes.append(float(Property.get("Value")))
         return outputTimes
 
-    def ReadNElements(self):
-        """ read number of cell elements of the mesh """
+    def ReadField(self, field, list_possible_location):
         root = self.tree.getroot()
-        list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
         for location in list_possible_location:
             for Property in root.findall(location):
                 path = Property.get("Reference")
-                if path is None:
-                    return int(Property.get("NumberOfElements"))
+                if not path:
+                    return Property.get(field)
                 else:
                     ref = tree.xpath(path)[0]
-                    return int(ref.get("NumberOfElements"))
-        raise NameError("nElements could not be determined")
+                    return ref.get(field)
+        raise NameError(f"{field} not found in {list_possible_location}")
+
+    def ReadNElements(self):
+        """ read number of cell elements of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
+        field  = self.ReadField("NumberOfElements", list_possible_location)
+        return int(field)
+
+    def ReadNNodes(self):
+        """ read number of vertex of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Geometry", "Domain/Grid/Geometry"]
+        field  = self.ReadField("NumberOfElements", list_possible_location)
+        return int(field)
+
+    def ReadNodesPerElement(self):
+        """ read number of nodes per elements of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Topology/DataItem", "Domain/Grid/Topology/DataItem"]
+        field  = self.ReadField("Dimensions", list_possible_location)
+        return int(field.split()[1])
 
     def ReadAvailableDataFields(self):
         """ read all available data fields, e.g. SRs or P_n """

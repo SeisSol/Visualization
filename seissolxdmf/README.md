@@ -9,6 +9,10 @@ fn = 'test-fault.xdmf'
 sx = seissolxdmf.seissolxdmf(fn)
 # Number of cells
 nElements = sx.ReadNElements()
+# Number of vertices
+nNodes = sx.ReadNNodes()
+# Number of nodes per elements
+nodesPerElement = sx.ReadNodesPerElement()
 # Read time step
 dt = sx.ReadTimeStep()
 # Read number of time steps

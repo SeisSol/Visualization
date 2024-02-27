@@ -2,6 +2,9 @@ import numpy as np
 import os
 
 
+known_1d_arrays = ["location-flag", "fault-tag", "partition", "clustering"]
+
+
 def dataLocation(prefix, name, backend):
     if backend == "hdf5":
         colon_or_nothing = ".h5:"
@@ -12,15 +15,7 @@ def dataLocation(prefix, name, backend):
     return f"{prefix}{colon_or_nothing}/{name}{ext}"
 
 
-def write_timeseries_xdmf(
-    prefix,
-    xyz,
-    connect,
-    dictData,
-    dictTime,
-    reduce_precision,
-    backend,
-):
+def compile_dictDataTypes(dictData, reduce_precision):
     precisionDict = {"int64": 8, "int32": 4, "float64": 8, "float32": 4}
     numberTypeDict = {
         "int64": "UInt",
@@ -28,12 +23,27 @@ def write_timeseries_xdmf(
         "float64": "Float",
         "float32": "Float",
     }
+    dictDataTypes = {}
+    for dataName, dataArray in dictData.items():
+        prec = 4 if reduce_precision else precisionDict[dataArray.dtype.name]
+        number_type = numberTypeDict[dataArray.dtype.name]
+        dictDataTypes[dataName] = (prec, number_type)
+    return dictDataTypes
 
+
+def write_timeseries_xdmf(
+    prefix,
+    nNodes,
+    nCells,
+    node_per_element,
+    dictDataTypes,
+    timeValues,
+    reduce_precision,
+    backend,
+):
     data_format = "HDF" if backend == "hdf5" else "Binary"
-    nNodes = xyz.shape[0]
-    nCells, node_per_element = connect.shape
-    lDataName = list(dictData.keys())
-    lData = list(dictData.values())
+    lDataName = list(dictDataTypes.keys())
+    lDataTypes = list(dictDataTypes.values())
     topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
     xdmf = """<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
@@ -42,11 +52,10 @@ def write_timeseries_xdmf(
     geometry_location = dataLocation(prefix, "geometry", backend)
     connect_location = dataLocation(prefix, "connect", backend)
 
-    for i, ctime in enumerate(list(dictTime.keys())):
-        index = dictTime[ctime]
+    for i, ctime in enumerate(timeValues):
         xdmf += f"""
   <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
-   <Grid Name="step_{index}" GridType="Uniform">
+   <Grid Name="step_{i}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
      <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
     </Topology>
@@ -54,11 +63,16 @@ def write_timeseries_xdmf(
      <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
     </Geometry>
     <Time Value="{ctime}"/>"""
-        for k, dataName in enumerate(lDataName):
-            prec = 4 if reduce_precision else precisionDict[lData[k].dtype.name]
-            number_type = numberTypeDict[lData[k].dtype.name]
+        for k, dataName in enumerate(list(dictDataTypes.keys())):
             data_location = dataLocation(prefix, dataName, backend)
-            xdmf += f"""
+            prec, number_type = dictDataTypes[dataName]
+            if dataName in known_1d_arrays:
+                xdmf += f"""
+    <Attribute Name="{dataName}" Center="Cell">
+     <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="1 {nCells}">{data_location}</DataItem>
+    </Attribute>"""
+            else:
+                xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
      <DataItem ItemType="HyperSlab" Dimensions="{nCells}">
       <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">{i} 0 1 1 1 {nCells}</DataItem>
@@ -79,49 +93,39 @@ def write_timeseries_xdmf(
 
 def write_mesh_xdmf(
     prefix,
-    xyz,
-    connect,
-    dictData,
+    nNodes,
+    nCells,
+    node_per_element,
+    dictDataTypes,
     reduce_precision,
     backend,
 ):
-    precisionDict = {"int64": 8, "int32": 4, "float64": 8, "float32": 4}
-    numberTypeDict = {
-        "int64": "UInt",
-        "int32": "UInt",
-        "float64": "Float",
-        "float32": "Float",
-    }
-
     data_format = "HDF" if backend == "hdf5" else "Binary"
-    nNodes = xyz.shape[0]
-    nCells, node_per_element = connect.shape
+    lDataName = list(dictDataTypes.keys())
+    lDataTypes = list(dictDataTypes.values())
     topology = "Tetrahedron" if node_per_element == 4 else "Triangle"
-    lDataName = list(dictData.keys())
-    lData = list(dictData.values())
+    xdmf = """<?xml version="1.0" ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="2.0">
+ <Domain>"""
     geometry_location = dataLocation(prefix, "geometry", backend)
     connect_location = dataLocation(prefix, "connect", backend)
 
-    xdmf = f"""<?xml version="1.0" ?>
-<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
-<Xdmf Version="2.0">
- <Domain>
+    xdmf += f"""
   <Grid Name="puml mesh" GridType="Uniform">
-   <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
-    <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
-   </Topology>
-   <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
-    <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
-   </Geometry>"""
-    for k, dataName in enumerate(lDataName):
-        prec = 4 if reduce_precision else precisionDict[lData[k].dtype.name]
-        number_type = numberTypeDict[lData[k].dtype.name]
+    <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
+     <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
+    </Topology>
+    <Geometry name="geo" GeometryType="XYZ" NumberOfElements="{nNodes}">
+     <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
+    </Geometry>"""
+    for k, dataName in enumerate(list(dictDataTypes.keys())):
         data_location = dataLocation(prefix, dataName, backend)
+        prec, number_type = dictDataTypes[dataName]
         xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
       <DataItem NumberType="{number_type}" Precision="{prec}" Format="{data_format}" Dimensions="1 {nCells}">{data_location}</DataItem>
     </Attribute>"""
-
     xdmf += """
   </Grid>
  </Domain>
@@ -132,16 +136,7 @@ def write_mesh_xdmf(
     print(f"done writing {prefix}.xdmf")
 
 
-def write_data(
-    prefix,
-    xyz,
-    connect,
-    dictData,
-    dictTime,
-    reduce_precision,
-    backend,
-    compression_level,
-):
+def output_type(input_array, reduce_precision):
     dtypeDict = {
         "int64": "i8",
         "int32": "i4",
@@ -154,9 +149,40 @@ def write_data(
         "float64": "float32",
         "float32": "float32",
     }
-    nCells, node_per_element = connect.shape
-    lDataName = list(dictData.keys())
-    lData = list(dictData.values())
+    mydtype = dtypeDict[input_array.dtype.name]
+    if reduce_precision:
+        mydtype = reducePrecisionDict[mydtype]
+    return mydtype
+
+
+def write_one_arr_hdf5(h5f, ar_name, ar_data, compression_options):
+    h5f.create_dataset(
+        f"/{ar_name}", ar_data.shape, dtype=ar_data.dtype, **compression_options
+    )
+    if len(ar_data.shape) == 1:
+        h5f[f"/{ar_name}"][:] = ar_data
+    else:
+        h5f[f"/{ar_name}"][:, :] = ar_data
+    return ar_data.shape
+
+
+def write_data_from_seissolxdmf(
+    prefix,
+    sx,
+    non_temporal_array_names,
+    array_names,
+    time_indices,
+    reduce_precision,
+    backend,
+    compression_level,
+):
+    def read_non_temporal(sx, ar_name):
+        if ar_name == "geometry":
+            return sx.ReadGeometry()
+        elif ar_name == "connect":
+            return sx.ReadConnect()
+        else:
+            return sx.Read1dData(ar_name, sx.nElements, isInt=True)
 
     if backend == "hdf5":
         import h5py
@@ -169,49 +195,95 @@ def write_data(
             }
 
         with h5py.File(prefix + ".h5", "w") as h5f:
-            h5f.create_dataset(
-                "/connect",
-                (nCells, node_per_element),
-                dtype="uint64",
-                **compression_options,
-            )
-            h5f["/connect"][:, :] = connect[:, :]
-            h5f.create_dataset("/geometry", xyz.shape, dtype="d", **compression_options)
-            h5f["/geometry"][:, :] = xyz[:, :]
-            for k, dataName in enumerate(lDataName):
-                hdname = "/" + dataName
-                mydtype = dtypeDict[lData[k].dtype.name]
-                if reduce_precision:
-                    mydtype = reducePrecisionDict[mydtype]
-                if len(lData[k].shape) == 1:
-                    lData[k] = lData[k][np.newaxis, :]
-                h5f.create_dataset(
-                    hdname,
-                    (len(dictTime), nCells),
-                    dtype=str(mydtype),
-                    **compression_options,
-                )
-                for i, idt in enumerate(list(dictTime.values())):
-                    h5f[hdname][i, :] = lData[k][idt, :]
+            for ar_name in non_temporal_array_names:
+                my_array = read_non_temporal(sx, ar_name)
+                write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
+            for ar_name in array_names:
+                for i, idt in enumerate(time_indices):
+                    if i == 0:
+                        h5f.create_dataset(
+                            f"/{ar_name}",
+                            (len(time_indices), sx.ReadNElements()),
+                            dtype=str(output_type(my_array, reduce_precision)),
+                            **compression_options,
+                        )
+                    my_array = sx.ReadData(ar_name, idt)
+                    if my_array.shape[0]==0:
+                        print(f"time step {idt} of {ar_name} is corrupted, replacing with 0s")
+                        myData = np.zeros(sx.ReadNElements())
+                    h5f[f"/{ar_name}"][i, :] = my_array[:]
         print(f"done writing {prefix}.h5")
     else:
         os.makedirs(prefix, exist_ok=True)
-        with open(f"{prefix}/geometry.bin", "wb") as fid:
-            xyz.tofile(fid)
-        with open(f"{prefix}/connect.bin", "wb") as fid:
-            connect.tofile(fid)
-        for k, dataName in enumerate(lDataName):
-            mydtype = dtypeDict[lData[k].dtype.name]
-            if reduce_precision:
-                mydtype = reducePrecisionDict[mydtype]
-            if len(lData[k].shape) == 1:
-                lData[k] = lData[k][np.newaxis, :]
-            with open(f"{prefix}/{dataName}.bin", "wb") as fid:
+        for ar_name in non_temporal_array_names:
+            my_array = read_non_temporal(sx, ar_name)
+            with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
+                my_array.tofile(fid)
+        for ar_name in array_names:
+            with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
+                for i, idt in enumerate(time_indices):
+                    my_array = sx.ReadData(ar_name, idt)
+                    if my_array.shape[0]==0:
+                        print(f"time step {idt} of {ar_name} is corrupted, replacing with 0s")
+                        myData = np.zeros(sx.ReadNElements())
+                    if i == 0:
+                        mydtype = output_type(my_array, reduce_precision)
+                    my_array[:].astype(mydtype).tofile(fid)
+        print(f"done writing binary files in {prefix}")
+
+def write_data(
+    prefix,
+    dicDataNonTemporal,
+    dictData,
+    dictTime,
+    reduce_precision,
+    backend,
+    compression_level,
+):
+    time_indices = list(dictTime.values())
+    if not time_indices:
+        time_indices = [0]
+    if backend == "hdf5":
+        import h5py
+
+        compression_options = {}
+        if compression_level:
+            compression_options = {
+                "compression": "gzip",
+                "compression_opts": compression_level,
+            }
+
+        with h5py.File(prefix + ".h5", "w") as h5f:
+            for ar_name, my_array in dicDataNonTemporal.items():
+                write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
+            for ar_name, my_array in dictData.items():
+                if len(my_array.shape) == 1:
+                    my_array = my_array[np.newaxis, :]
+                for i, idt in enumerate(time_indices):
+                    if i == 0:
+                        h5f.create_dataset(
+                            f"/{ar_name}",
+                            (len(time_indices), my_array.shape[1]),
+                            dtype=str(output_type(my_array, reduce_precision)),
+                            **compression_options,
+                        )
+                    h5f[f"/{ar_name}"][i, :] = my_array[idt, :]
+        print(f"done writing {prefix}.h5")
+    else:
+        os.makedirs(prefix, exist_ok=True)
+        for ar_name, my_array in dicDataNonTemporal.items():
+            with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
+                my_array.tofile(fid)
+        for ar_name, my_array in dictData.items():
+            if len(my_array.shape) == 1:
+                my_array = my_array[np.newaxis, :]
+            mydtype = output_type(my_array, reduce_precision)
+            with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
                 if not dictTime:
-                    lData[k][:].astype(mydtype).tofile(fid)
+                    my_array[:].astype(mydtype).tofile(fid)
                 else:
-                    for i, idt in enumerate(list(dictTime.values())):
-                        lData[k][idt, :].astype(mydtype).tofile(fid)
+                    for i, idt in enumerate(time_indices):
+                        my_array[idt, :].astype(mydtype).tofile(fid)
         print(f"done writing binary files in {prefix}")
 
 
@@ -278,6 +350,15 @@ def write(
     """
     nNodes = xyz.shape[0]
     nCells, node_per_element = connect.shape
+
+    dictDataTypes = compile_dictDataTypes(dictData, reduce_precision)
+
+    dicDataNonTemporal = {"geometry": xyz, "connect": connect}
+    to_move = [name for name in dictData.keys() if name in known_1d_arrays]
+
+    for name in to_move:
+        dicDataNonTemporal[name] = dictData.pop(name)
+
     if backend not in ("hdf5", "raw"):
         raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
@@ -300,29 +381,98 @@ def write(
     if not dictTime:
         write_mesh_xdmf(
             prefix,
-            xyz,
-            connect,
-            dictData,
+            nNodes,
+            nCells,
+            node_per_element,
+            dictDataTypes,
             reduce_precision,
             backend,
         )
     else:
         write_timeseries_xdmf(
             prefix,
-            xyz,
-            connect,
-            dictData,
-            dictTime,
+            nNodes,
+            nCells,
+            node_per_element,
+            dictDataTypes,
+            dictTime.keys(),
             reduce_precision,
             backend,
         )
+
     write_data(
         prefix,
-        xyz,
-        connect,
+        dicDataNonTemporal,
         dictData,
         dictTime,
         reduce_precision,
         backend,
         compression_level,
+    )
+
+
+def write_from_seissol_output(
+    prefix,
+    input_file,
+    varNames,
+    time_indices,
+    reduce_precision=False,
+    backend="hdf5",
+    compression_level=4,
+):
+    """
+    Write hdf5/xdmf files output, readable by ParaView from a seissolxdmf object
+    prefix: file
+    input_file: filename of the seissol input
+    varNames: list of variables to extract
+    time_indices: list of times indices to extract
+    reduce_precision: convert double to float and i64 to i32 if True
+    backend: data format ("hdf5" or "raw")
+    """
+    import seissolxdmf as sx
+
+    if backend not in ("hdf5", "raw"):
+        raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
+    if compression_level < 0 or compression_level > 9:
+        raise ValueError("compression_level has to be in 0-9")
+
+    sx = sx.seissolxdmf(input_file)
+
+    non_temporal_array_names = ["geometry", "connect"]
+    to_move = [name for name in varNames if name in known_1d_arrays]
+    dictDataTypes = {}
+    for name in to_move:
+        varNames.remove(name)
+        non_temporal_array_names.append(name)
+        dictDataTypes[name] = (4, "UInt")
+
+    for name in varNames:
+        (
+            dataLocation,
+            data_prec,
+            MemDimension,
+        ) = sx.GetDataLocationPrecisionMemDimension(name)
+        data_prec = 4 if reduce_precision else data_prec
+        dictDataTypes[name] = (data_prec, "Float")
+
+    write_data_from_seissolxdmf(
+        prefix,
+        sx,
+        non_temporal_array_names,
+        varNames,
+        time_indices,
+        reduce_precision,
+        backend,
+        compression_level,
+    )
+
+    write_timeseries_xdmf(
+        prefix,
+        sx.ReadNNodes(),
+        sx.ReadNElements(),
+        sx.ReadNodesPerElement(),
+        dictDataTypes,
+        [sx.ReadTimes()[k] for k in time_indices],
+        reduce_precision,
+        backend,
     )
