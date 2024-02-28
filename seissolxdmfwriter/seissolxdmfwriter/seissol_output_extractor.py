@@ -131,6 +131,12 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
         else:
             return super().ReadData(dataName, idt)
 
+    def GetDataLocationPrecisionMemDimension(self, dataName):
+        if dataName == "SR" and "SR" not in self.ReadAvailableDataFields():
+            return super().GetDataLocationPrecisionMemDimension("SRs")
+        else:
+            return super().GetDataLocationPrecisionMemDimension(dataName)
+
 
 def main():
     sx = SeissolxdmfExtended(args.xdmfFilename)
@@ -184,7 +190,7 @@ def main():
 
     sxw.write_from_seissol_output(
         prefix_new,
-        args.xdmfFilename,
+        sx,
         args.variables,
         indices,
         reduce_precision=True,

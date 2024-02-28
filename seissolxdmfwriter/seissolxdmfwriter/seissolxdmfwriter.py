@@ -215,6 +215,7 @@ def write_data_from_seissolxdmf(
                     desc=ar_name,
                     dynamic_ncols=False,
                 ):
+                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
@@ -222,7 +223,6 @@ def write_data_from_seissolxdmf(
                             dtype=str(output_type(my_array, reduce_precision)),
                             **compression_options,
                         )
-                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if my_array.shape[0] == 0:
                         print(
                             f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
@@ -438,7 +438,7 @@ def write(
 
 def write_from_seissol_output(
     prefix,
-    input_file,
+    sx,
     var_names,
     time_indices,
     reduce_precision=False,
@@ -449,20 +449,16 @@ def write_from_seissol_output(
     """
     Write hdf5/xdmf files output, readable by ParaView from a seissolxdmf object
     prefix: file
-    input_file: filename of the seissol input
+    sx: seissolxdmf object
     var_names: list of variables to extract
     time_indices: list of times indices to extract
     reduce_precision: convert double to float and i64 to i32 if True
     backend: data format ("hdf5" or "raw")
     """
-    import seissolxdmf as sx
-
     if backend not in ("hdf5", "raw"):
         raise ValueError(f"Invalid backend {backend}. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
         raise ValueError("compression_level has to be in 0-9")
-
-    sx = sx.seissolxdmf(input_file)
 
     non_temporal_array_names = ["geometry", "connect"]
     to_move = [name for name in var_names if name in known_1d_arrays]
