@@ -81,7 +81,7 @@ class seissolxdmf:
 
         fid = open(absolute_path, "r")
         if oneDtMem:
-            assert idt < self.ndt
+            assert idt < self.ndt, f"{idt} < {self.ndt}"
             fid.seek((idt * MemDimension + firstElement) * data_prec, os.SEEK_SET)
             myData = np.fromfile(fid, dtype=data_type, count=nchunk)
         else:
@@ -176,19 +176,35 @@ class seissolxdmf:
             outputTimes.append(float(Property.get("Value")))
         return outputTimes
 
-    def ReadNElements(self):
-        """ read number of cell elements of the mesh """
+    def ReadAttributeValue(self, attribute, list_possible_location):
         root = self.tree.getroot()
-        list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
         for location in list_possible_location:
             for Property in root.findall(location):
                 path = Property.get("Reference")
-                if path is None:
-                    return int(Property.get("NumberOfElements"))
+                if not path:
+                    return Property.get(attribute)
                 else:
                     ref = tree.xpath(path)[0]
-                    return int(ref.get("NumberOfElements"))
-        raise NameError("nElements could not be determined")
+                    return ref.get(attribute)
+        raise NameError(f"{attribute} not found in {list_possible_location}")
+
+    def ReadNElements(self):
+        """ read number of cell elements of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
+        value  = self.ReadAttributeValue("NumberOfElements", list_possible_location)
+        return int(value)
+
+    def ReadNNodes(self):
+        """ read number of vertex of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Geometry", "Domain/Grid/Geometry"]
+        value  = self.ReadAttributeValue("NumberOfElements", list_possible_location)
+        return int(value)
+
+    def ReadNodesPerElement(self):
+        """ read number of nodes per elements of the mesh """
+        list_possible_location = ["Domain/Grid/Grid/Topology/DataItem", "Domain/Grid/Topology/DataItem"]
+        value  = self.ReadAttributeValue("Dimensions", list_possible_location)
+        return int(value.split()[1])
 
     def ReadAvailableDataFields(self):
         """ read all available data fields, e.g. SRs or P_n """

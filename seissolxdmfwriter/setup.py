@@ -23,11 +23,16 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/SeisSol/Visualization/seissolxdmfwriter",
     packages=setuptools.find_packages(),
+    entry_points={
+        'console_scripts': [
+            'seissol_output_extractor = seissolxdmfwriter.seissol_output_extractor:main',
+        ],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.6",
-    install_requires=["numpy", "h5py"],
+    install_requires=["numpy", "h5py","seissolxdmf>=0.1.2"],
 )
