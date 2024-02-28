@@ -3,7 +3,7 @@ import os
 from tqdm import tqdm
 import sys
 
-known_1d_arrays = ["location-flag", "fault-tag", "partition", "clustering"]
+known_1d_arrays = ["locationFlag", "fault-tag", "partition", "clustering"]
 
 
 def dataLocation(prefix, name, backend):
