@@ -176,35 +176,35 @@ class seissolxdmf:
             outputTimes.append(float(Property.get("Value")))
         return outputTimes
 
-    def ReadField(self, field, list_possible_location):
+    def ReadAttributeValue(self, attribute, list_possible_location):
         root = self.tree.getroot()
         for location in list_possible_location:
             for Property in root.findall(location):
                 path = Property.get("Reference")
                 if not path:
-                    return Property.get(field)
+                    return Property.get(attribute)
                 else:
                     ref = tree.xpath(path)[0]
-                    return ref.get(field)
-        raise NameError(f"{field} not found in {list_possible_location}")
+                    return ref.get(attribute)
+        raise NameError(f"{attribute} not found in {list_possible_location}")
 
     def ReadNElements(self):
         """ read number of cell elements of the mesh """
         list_possible_location = ["Domain/Grid/Grid/Topology", "Domain/Grid/Topology"]
-        field  = self.ReadField("NumberOfElements", list_possible_location)
-        return int(field)
+        value  = self.ReadAttributeValue("NumberOfElements", list_possible_location)
+        return int(value)
 
     def ReadNNodes(self):
         """ read number of vertex of the mesh """
         list_possible_location = ["Domain/Grid/Grid/Geometry", "Domain/Grid/Geometry"]
-        field  = self.ReadField("NumberOfElements", list_possible_location)
-        return int(field)
+        value  = self.ReadAttributeValue("NumberOfElements", list_possible_location)
+        return int(value)
 
     def ReadNodesPerElement(self):
         """ read number of nodes per elements of the mesh """
         list_possible_location = ["Domain/Grid/Grid/Topology/DataItem", "Domain/Grid/Topology/DataItem"]
-        field  = self.ReadField("Dimensions", list_possible_location)
-        return int(field.split()[1])
+        value  = self.ReadAttributeValue("Dimensions", list_possible_location)
+        return int(value.split()[1])
 
     def ReadAvailableDataFields(self):
         """ read all available data fields, e.g. SRs or P_n """
