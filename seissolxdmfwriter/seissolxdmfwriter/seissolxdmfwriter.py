@@ -166,6 +166,13 @@ def write_one_arr_hdf5(h5f, ar_name, ar_data, compression_options):
     return ar_data.shape
 
 
+def infer_n_elements(sx, filtered_cells):
+    if isinstance(filtered_cells, slice) and filtered_cells == slice(None):
+        return sx.ReadNElements()
+    else:
+        return len(filtered_cells)
+
+
 def write_data_from_seissolxdmf(
     prefix,
     sx,
@@ -175,15 +182,17 @@ def write_data_from_seissolxdmf(
     reduce_precision,
     backend,
     compression_level,
+    filtered_cells,
 ):
-    def read_non_temporal(sx, ar_name):
+    def read_non_temporal(sx, ar_name, filtered_cells):
         if ar_name == "geometry":
             return sx.ReadGeometry()
         elif ar_name == "connect":
-            return sx.ReadConnect()
+            return sx.ReadConnect()[filtered_cells, :]
         else:
-            return sx.Read1dData(ar_name, sx.nElements, isInt=True)
+            return sx.Read1dData(ar_name, sx.nElements, isInt=True)[:, filtered_cells]
 
+    nel = infer_n_elements(sx, filtered_cells)
     if backend == "hdf5":
         import h5py
 
@@ -196,40 +205,45 @@ def write_data_from_seissolxdmf(
 
         with h5py.File(prefix + ".h5", "w") as h5f:
             for ar_name in non_temporal_array_names:
-                my_array = read_non_temporal(sx, ar_name)
+                my_array = read_non_temporal(sx, ar_name, filtered_cells)
                 write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
             for ar_name in array_names:
                 for i, idt in enumerate(time_indices):
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
-                            (len(time_indices), sx.ReadNElements()),
+                            (len(time_indices), nel),
                             dtype=str(output_type(my_array, reduce_precision)),
                             **compression_options,
                         )
-                    my_array = sx.ReadData(ar_name, idt)
-                    if my_array.shape[0]==0:
-                        print(f"time step {idt} of {ar_name} is corrupted, replacing with 0s")
-                        myData = np.zeros(sx.ReadNElements())
+                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
+                    if my_array.shape[0] == 0:
+                        print(
+                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                        )
+                        myData = np.zeros(nel)
                     h5f[f"/{ar_name}"][i, :] = my_array[:]
         print(f"done writing {prefix}.h5")
     else:
         os.makedirs(prefix, exist_ok=True)
         for ar_name in non_temporal_array_names:
-            my_array = read_non_temporal(sx, ar_name)
+            my_array = read_non_temporal(sx, ar_name, filtered_cells)
             with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
                 my_array.tofile(fid)
         for ar_name in array_names:
             with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
                 for i, idt in enumerate(time_indices):
-                    my_array = sx.ReadData(ar_name, idt)
-                    if my_array.shape[0]==0:
-                        print(f"time step {idt} of {ar_name} is corrupted, replacing with 0s")
-                        myData = np.zeros(sx.ReadNElements())
+                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
+                    if my_array.shape[0] == 0:
+                        print(
+                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                        )
+                        myData = np.zeros(nel)
                     if i == 0:
                         mydtype = output_type(my_array, reduce_precision)
                     my_array[:].astype(mydtype).tofile(fid)
         print(f"done writing binary files in {prefix}")
+
 
 def write_data(
     prefix,
@@ -414,17 +428,18 @@ def write(
 def write_from_seissol_output(
     prefix,
     input_file,
-    varNames,
+    var_names,
     time_indices,
     reduce_precision=False,
     backend="hdf5",
     compression_level=4,
+    filtered_cells=slice(None),
 ):
     """
     Write hdf5/xdmf files output, readable by ParaView from a seissolxdmf object
     prefix: file
     input_file: filename of the seissol input
-    varNames: list of variables to extract
+    var_names: list of variables to extract
     time_indices: list of times indices to extract
     reduce_precision: convert double to float and i64 to i32 if True
     backend: data format ("hdf5" or "raw")
@@ -439,14 +454,14 @@ def write_from_seissol_output(
     sx = sx.seissolxdmf(input_file)
 
     non_temporal_array_names = ["geometry", "connect"]
-    to_move = [name for name in varNames if name in known_1d_arrays]
+    to_move = [name for name in var_names if name in known_1d_arrays]
     dictDataTypes = {}
     for name in to_move:
-        varNames.remove(name)
+        var_names.remove(name)
         non_temporal_array_names.append(name)
         dictDataTypes[name] = (4, "UInt")
 
-    for name in varNames:
+    for name in var_names:
         (
             dataLocation,
             data_prec,
@@ -459,17 +474,19 @@ def write_from_seissol_output(
         prefix,
         sx,
         non_temporal_array_names,
-        varNames,
+        var_names,
         time_indices,
         reduce_precision,
         backend,
         compression_level,
+        filtered_cells,
     )
 
+    nel = infer_n_elements(sx, filtered_cells)
     write_timeseries_xdmf(
         prefix,
         sx.ReadNNodes(),
-        sx.ReadNElements(),
+        nel,
         sx.ReadNodesPerElement(),
         dictDataTypes,
         [sx.ReadTimes()[k] for k in time_indices],
