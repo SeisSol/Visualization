@@ -81,7 +81,7 @@ class seissolxdmf:
 
         fid = open(absolute_path, "r")
         if oneDtMem:
-            assert idt < self.ndt
+            assert idt < self.ndt, f"{idt} < {self.ndt}"
             fid.seek((idt * MemDimension + firstElement) * data_prec, os.SEEK_SET)
             myData = np.fromfile(fid, dtype=data_type, count=nchunk)
         else:

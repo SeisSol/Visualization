@@ -1,6 +1,7 @@
 import numpy as np
 import os
-
+from tqdm import tqdm
+import sys
 
 known_1d_arrays = ["location-flag", "fault-tag", "partition", "clustering"]
 
@@ -208,7 +209,12 @@ def write_data_from_seissolxdmf(
                 my_array = read_non_temporal(sx, ar_name, filtered_cells)
                 write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
             for ar_name in array_names:
-                for i, idt in enumerate(time_indices):
+                for i, idt in tqdm(
+                    enumerate(time_indices),
+                    file=sys.stdout,
+                    desc=ar_name,
+                    dynamic_ncols=False,
+                ):
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
@@ -232,7 +238,12 @@ def write_data_from_seissolxdmf(
                 my_array.tofile(fid)
         for ar_name in array_names:
             with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
-                for i, idt in enumerate(time_indices):
+                for i, idt in tqdm(
+                    enumerate(time_indices),
+                    file=sys.stdout,
+                    desc=ar_name,
+                    dynamic_ncols=False,
+                ):
                     my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if my_array.shape[0] == 0:
                         print(
@@ -374,7 +385,7 @@ def write(
         dicDataNonTemporal[name] = dictData.pop(name)
 
     if backend not in ("hdf5", "raw"):
-        raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
+        raise ValueError(f"Invalid backend {backend}. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
         raise ValueError("compression_level has to be in 0-9")
 
@@ -447,7 +458,7 @@ def write_from_seissol_output(
     import seissolxdmf as sx
 
     if backend not in ("hdf5", "raw"):
-        raise ValueError("Invalid backend. Must be 'hdf5' or 'raw'.")
+        raise ValueError(f"Invalid backend {backend}. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
         raise ValueError("compression_level has to be in 0-9")
 

@@ -46,3 +46,4 @@ sxw.write_from_seissol_output(
 
 ```
 
+The module also encapsulates `seissol_output_extractor.py`, which can be used to extract and process data from SeisSol output files, allowing selection of variables, time steps, spatial ranges, and output format.
