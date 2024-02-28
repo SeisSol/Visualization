@@ -35,7 +35,7 @@ sxw.write(
 # the memory requirements
 
 sxw.write_from_seissol_output(
-    'test-fault-raw-sx',
+    'test-fault-sx',
     fn,
     ['SRs', 'SRd','fault-tag', 'partition'],
     [3,4],
