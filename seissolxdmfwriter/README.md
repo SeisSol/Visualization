@@ -46,4 +46,9 @@ sxw.write_from_seissol_output(
 
 ```
 
-The module also encapsulates `seissol_output_extractor.py`, which can be used to extract and process data from SeisSol output files, allowing selection of variables, time steps, spatial ranges, and output format.
+The module also encapsulates `seissol_output_extractor`, which can be used to extract and process data from SeisSol output files, allowing selection of variables, time steps, spatial ranges, and output format.
+Here is an example of use:
+
+```bash
+seissol_output_extractor test-fault.xdmf --time "i2,i4" --variable PSR Vr partition
+```

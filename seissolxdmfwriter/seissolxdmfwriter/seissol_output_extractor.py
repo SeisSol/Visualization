@@ -97,14 +97,14 @@ args = parser.parse_args()
 class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
     def ComputeTimeIndices(self, at_time):
         """retrive list of time index in file"""
-        outputTimes = np.array(sx.ReadTimes())
+        outputTimes = np.array(self.ReadTimes())
         idsReadTimes = list(range(0, len(outputTimes)))
         lidt = []
         for oTime in at_time:
             if not oTime.startswith("i"):
                 idsClose = np.where(np.isclose(outputTimes, float(oTime), atol=0.0001))
                 if not len(idsClose[0]):
-                    print(f"t={oTime} not found in {sx.xdmfFilename}")
+                    print(f"t={oTime} not found in {self.xdmfFilename}")
                 else:
                     lidt.append(idsClose[0][0])
             else:
@@ -124,7 +124,7 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
         return sorted(list(set(lidt)))
 
     def ReadData(self, dataName, idt=-1):
-        if dataName == "SR" and "SR" not in sx.ReadAvailableDataFields():
+        if dataName == "SR" and "SR" not in self.ReadAvailableDataFields():
             SRs = super().ReadData("SRs", idt)
             SRd = super().ReadData("SRd", idt)
             return np.sqrt(SRs**2 + SRd**2)
@@ -132,60 +132,67 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
             return super().ReadData(dataName, idt)
 
 
-sx = SeissolxdmfExtended(args.xdmfFilename)
-spatial_filtering = (args.xRange or args.yRange) or args.zRange
+def main():
+    sx = SeissolxdmfExtended(args.xdmfFilename)
+    spatial_filtering = (args.xRange or args.yRange) or args.zRange
 
-if spatial_filtering:
-    xyz = sx.ReadGeometry()
-    connect = sx.ReadConnect()
-    print("Warning: spatial filtering significantly slows down this script")
-    ids = range(0, sx.nElements)
-    xyzc = (xyz[connect[:, 0], :] + xyz[connect[:, 1], :] + xyz[connect[:, 2], :]) / 3.0
+    if spatial_filtering:
+        xyz = sx.ReadGeometry()
+        connect = sx.ReadConnect()
+        print("Warning: spatial filtering significantly slows down this script")
+        ids = range(0, sx.nElements)
+        xyzc = (
+            xyz[connect[:, 0], :] + xyz[connect[:, 1], :] + xyz[connect[:, 2], :]
+        ) / 3.0
 
-    def filter_cells(coords, filter_range):
-        m = 0.5 * (filter_range[0] + filter_range[1])
-        d = 0.5 * (filter_range[1] - filter_range[0])
-        return np.where(np.abs(coords[:] - m) < d)[0]
+        def filter_cells(coords, filter_range):
+            m = 0.5 * (filter_range[0] + filter_range[1])
+            d = 0.5 * (filter_range[1] - filter_range[0])
+            return np.where(np.abs(coords[:] - m) < d)[0]
 
-    if args.xRange:
-        id0 = filter_cells(xyzc[:, 0], args.xRange)
-        ids = np.intersect1d(ids, id0) if len(ids) else id0
-    if args.yRange:
-        id0 = filter_cells(xyzc[:, 1], args.yRange)
-        ids = np.intersect1d(ids, id0) if len(ids) else id0
-    if args.zRange:
-        id0 = filter_cells(xyzc[:, 2], args.zRange)
-        ids = np.intersect1d(ids, id0) if len(ids) else id0
+        if args.xRange:
+            id0 = filter_cells(xyzc[:, 0], args.xRange)
+            ids = np.intersect1d(ids, id0) if len(ids) else id0
+        if args.yRange:
+            id0 = filter_cells(xyzc[:, 1], args.yRange)
+            ids = np.intersect1d(ids, id0) if len(ids) else id0
+        if args.zRange:
+            id0 = filter_cells(xyzc[:, 2], args.zRange)
+            ids = np.intersect1d(ids, id0) if len(ids) else id0
 
-    if len(ids):
-        nElements = ids.shape[0]
-        if nElements != sx.nElements:
-            print(f"extracting {nElements} cells out of {sx.nElements}")
+        if len(ids):
+            nElements = ids.shape[0]
+            if nElements != sx.nElements:
+                print(f"extracting {nElements} cells out of {sx.nElements}")
+            else:
+                spatial_filtering = False
         else:
-            spatial_filtering = False
-    else:
-        raise ValueError("all elements are outside filter range")
+            raise ValueError("all elements are outside filter range")
 
-if not spatial_filtering:
-    ids = slice(None)
+    if not spatial_filtering:
+        ids = slice(None)
 
-indices = sx.ComputeTimeIndices(args.time[0].split(","))
+    indices = sx.ComputeTimeIndices(args.time[0].split(","))
 
-prefix = os.path.splitext(args.xdmfFilename)[0]
-prefix_new = generate_new_prefix(prefix, args.add2prefix)
+    prefix = os.path.splitext(args.xdmfFilename)[0]
+    prefix_new = generate_new_prefix(prefix, args.add2prefix)
 
-# Write data items
-if args.variables[0] == "all":
-    args.variables = sorted(sx.ReadAvailableDataFields())
-    print(f"args.variables was set to all and now contains {args.variables}")
+    # Write data items
+    if args.variables[0] == "all":
+        args.variables = sorted(sx.ReadAvailableDataFields())
+        print(f"args.variables was set to all and now contains {args.variables}")
 
-sxw.write_from_seissol_output(
-    prefix_new,
-    args.xdmfFilename,
-    args.variables,
-    indices,
-    reduce_precision=True,
-    backend=args.backend,
-    compression_level=args.compression,
-    filtered_cells=ids,
-)
+    sxw.write_from_seissol_output(
+        prefix_new,
+        args.xdmfFilename,
+        args.variables,
+        indices,
+        reduce_precision=True,
+        backend=args.backend,
+        compression_level=args.compression,
+        filtered_cells=ids,
+    )
+
+
+if __name__ == "__main__":
+    main()
