@@ -29,7 +29,7 @@ parser.add_argument(
     "--add2prefix",
     help="string to append to the prefix in the new file",
     type=str,
-    default="_resampled",
+    default="_extracted",
 )
 parser.add_argument(
     "--variables",

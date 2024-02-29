@@ -90,6 +90,8 @@ def write_timeseries_xdmf(
     with open(prefix + ".xdmf", "w") as fid:
         fid.write(xdmf)
     print(f"done writing {prefix}.xdmf")
+    full_path = os.path.abspath(f"{prefix}.xdmf")
+    print(f"full path: {full_path}")
 
 
 def write_mesh_xdmf(
@@ -135,6 +137,8 @@ def write_mesh_xdmf(
     with open(prefix + ".xdmf", "w") as fid:
         fid.write(xdmf)
     print(f"done writing {prefix}.xdmf")
+    full_path = os.path.abspath(f"{prefix}.xdmf")
+    print(f"full path: {full_path}")
 
 
 def output_type(input_array, reduce_precision):
