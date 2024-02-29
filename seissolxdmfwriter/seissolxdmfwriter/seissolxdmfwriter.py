@@ -195,7 +195,7 @@ def write_data_from_seissolxdmf(
         elif ar_name == "connect":
             return sx.ReadConnect()[filtered_cells, :]
         else:
-            return sx.Read1dData(ar_name, sx.nElements, isInt=True)[:, filtered_cells]
+            return sx.Read1dData(ar_name, sx.nElements, isInt=True)[filtered_cells]
 
     nel = infer_n_elements(sx, filtered_cells)
     if backend == "hdf5":
