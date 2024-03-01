@@ -42,6 +42,7 @@ def write_timeseries_xdmf(
     reduce_precision,
     backend,
 ):
+    bn_prefix = os.path.basename(prefix)
     data_format = "HDF" if backend == "hdf5" else "Binary"
     lDataName = list(dictDataTypes.keys())
     lDataTypes = list(dictDataTypes.values())
@@ -50,8 +51,8 @@ def write_timeseries_xdmf(
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
-    geometry_location = dataLocation(prefix, "geometry", backend)
-    connect_location = dataLocation(prefix, "connect", backend)
+    geometry_location = dataLocation(bn_prefix, "geometry", backend)
+    connect_location = dataLocation(bn_prefix, "connect", backend)
 
     for i, ctime in enumerate(timeValues):
         xdmf += f"""
@@ -65,7 +66,7 @@ def write_timeseries_xdmf(
     </Geometry>
     <Time Value="{ctime}"/>"""
         for k, dataName in enumerate(list(dictDataTypes.keys())):
-            data_location = dataLocation(prefix, dataName, backend)
+            data_location = dataLocation(bn_prefix, dataName, backend)
             prec, number_type = dictDataTypes[dataName]
             if dataName in known_1d_arrays:
                 xdmf += f"""
@@ -103,6 +104,7 @@ def write_mesh_xdmf(
     reduce_precision,
     backend,
 ):
+    bn_prefix = os.path.basename(prefix)
     data_format = "HDF" if backend == "hdf5" else "Binary"
     lDataName = list(dictDataTypes.keys())
     lDataTypes = list(dictDataTypes.values())
@@ -111,8 +113,8 @@ def write_mesh_xdmf(
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
-    geometry_location = dataLocation(prefix, "geometry", backend)
-    connect_location = dataLocation(prefix, "connect", backend)
+    geometry_location = dataLocation(bn_prefix, "geometry", backend)
+    connect_location = dataLocation(bn_prefix, "connect", backend)
 
     xdmf += f"""
   <Grid Name="puml mesh" GridType="Uniform">
@@ -123,7 +125,7 @@ def write_mesh_xdmf(
      <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
     </Geometry>"""
     for k, dataName in enumerate(list(dictDataTypes.keys())):
-        data_location = dataLocation(prefix, dataName, backend)
+        data_location = dataLocation(bn_prefix, dataName, backend)
         prec, number_type = dictDataTypes[dataName]
         xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
