@@ -238,7 +238,7 @@ class seissolxdmf:
             myData = self.ReadHdf5DatasetChunk(path + filename, hdf5var, 0, MemDimension)
         else:
             filename = dataLocation
-            myData = self.ReadSimpleBinaryFile(path + dataLocation, nElements, data_prec, isInt)
+            myData = self.ReadSimpleBinaryFile(path + dataLocation, nElements, data_prec, isInt, 0)
         return myData
 
     def ReadPartition(self):
