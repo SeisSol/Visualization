@@ -188,6 +188,13 @@ def main():
         args.variables = sorted(sx.ReadAvailableDataFields())
         print(f"args.variables was set to all and now contains {args.variables}")
 
+    if args.backend == "hdf5" and args.compression > 0:
+        print(
+            "Writing hdf5 output with compression enabled"
+            f" (compression_level={args.compression}). Use --compression=0 if you want"
+            " to speed-up data extraction."
+        )
+
     sxw.write_from_seissol_output(
         prefix_new,
         sx,
