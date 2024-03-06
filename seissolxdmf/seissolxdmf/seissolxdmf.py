@@ -237,6 +237,10 @@ class seissolxdmf:
             filename, hdf5var = splitArgs
             myData = self.ReadHdf5DatasetChunk(path + filename, hdf5var, 0, MemDimension)
         else:
+            # The Dimensions of the 1D arrays (e.g. partition) in the xdmf files
+            # are not not accounting for potential 0 padding (bug in xdmfwriter?).
+            # Therefore, we precise that there is only one "time-step" to read at location 0
+            # by setting idt=0
             filename = dataLocation
             myData = self.ReadSimpleBinaryFile(path + dataLocation, nElements, data_prec, isInt, 0)
         return myData
