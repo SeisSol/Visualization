@@ -34,5 +34,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.6",
-    install_requires=["numpy", "h5py","seissolxdmf>=0.1.2"],
+    install_requires=["numpy", "h5py","seissolxdmf>=0.1.2", "tqdm"],
 )

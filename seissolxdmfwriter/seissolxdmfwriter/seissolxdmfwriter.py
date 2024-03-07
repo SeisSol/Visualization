@@ -42,6 +42,7 @@ def write_timeseries_xdmf(
     reduce_precision,
     backend,
 ):
+    bn_prefix = os.path.basename(prefix)
     data_format = "HDF" if backend == "hdf5" else "Binary"
     lDataName = list(dictDataTypes.keys())
     lDataTypes = list(dictDataTypes.values())
@@ -50,8 +51,8 @@ def write_timeseries_xdmf(
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
-    geometry_location = dataLocation(prefix, "geometry", backend)
-    connect_location = dataLocation(prefix, "connect", backend)
+    geometry_location = dataLocation(bn_prefix, "geometry", backend)
+    connect_location = dataLocation(bn_prefix, "connect", backend)
 
     for i, ctime in enumerate(timeValues):
         xdmf += f"""
@@ -65,7 +66,7 @@ def write_timeseries_xdmf(
     </Geometry>
     <Time Value="{ctime}"/>"""
         for k, dataName in enumerate(list(dictDataTypes.keys())):
-            data_location = dataLocation(prefix, dataName, backend)
+            data_location = dataLocation(bn_prefix, dataName, backend)
             prec, number_type = dictDataTypes[dataName]
             if dataName in known_1d_arrays:
                 xdmf += f"""
@@ -90,6 +91,8 @@ def write_timeseries_xdmf(
     with open(prefix + ".xdmf", "w") as fid:
         fid.write(xdmf)
     print(f"done writing {prefix}.xdmf")
+    full_path = os.path.abspath(f"{prefix}.xdmf")
+    print(f"full path: {full_path}")
 
 
 def write_mesh_xdmf(
@@ -101,6 +104,7 @@ def write_mesh_xdmf(
     reduce_precision,
     backend,
 ):
+    bn_prefix = os.path.basename(prefix)
     data_format = "HDF" if backend == "hdf5" else "Binary"
     lDataName = list(dictDataTypes.keys())
     lDataTypes = list(dictDataTypes.values())
@@ -109,8 +113,8 @@ def write_mesh_xdmf(
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
  <Domain>"""
-    geometry_location = dataLocation(prefix, "geometry", backend)
-    connect_location = dataLocation(prefix, "connect", backend)
+    geometry_location = dataLocation(bn_prefix, "geometry", backend)
+    connect_location = dataLocation(bn_prefix, "connect", backend)
 
     xdmf += f"""
   <Grid Name="puml mesh" GridType="Uniform">
@@ -121,7 +125,7 @@ def write_mesh_xdmf(
      <DataItem NumberType="Float" Precision="8" Format="{data_format}" Dimensions="{nNodes} 3">{geometry_location}</DataItem>
     </Geometry>"""
     for k, dataName in enumerate(list(dictDataTypes.keys())):
-        data_location = dataLocation(prefix, dataName, backend)
+        data_location = dataLocation(bn_prefix, dataName, backend)
         prec, number_type = dictDataTypes[dataName]
         xdmf += f"""
     <Attribute Name="{dataName}" Center="Cell">
@@ -135,6 +139,8 @@ def write_mesh_xdmf(
     with open(prefix + ".xdmf", "w") as fid:
         fid.write(xdmf)
     print(f"done writing {prefix}.xdmf")
+    full_path = os.path.abspath(f"{prefix}.xdmf")
+    print(f"full path: {full_path}")
 
 
 def output_type(input_array, reduce_precision):
@@ -191,7 +197,7 @@ def write_data_from_seissolxdmf(
         elif ar_name == "connect":
             return sx.ReadConnect()[filtered_cells, :]
         else:
-            return sx.Read1dData(ar_name, sx.nElements, isInt=True)[:, filtered_cells]
+            return sx.Read1dData(ar_name, sx.nElements, isInt=True)[filtered_cells]
 
     nel = infer_n_elements(sx, filtered_cells)
     if backend == "hdf5":
@@ -215,6 +221,7 @@ def write_data_from_seissolxdmf(
                     desc=ar_name,
                     dynamic_ncols=False,
                 ):
+                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
@@ -222,7 +229,6 @@ def write_data_from_seissolxdmf(
                             dtype=str(output_type(my_array, reduce_precision)),
                             **compression_options,
                         )
-                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if my_array.shape[0] == 0:
                         print(
                             f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
@@ -438,7 +444,7 @@ def write(
 
 def write_from_seissol_output(
     prefix,
-    input_file,
+    sx,
     var_names,
     time_indices,
     reduce_precision=False,
@@ -449,20 +455,16 @@ def write_from_seissol_output(
     """
     Write hdf5/xdmf files output, readable by ParaView from a seissolxdmf object
     prefix: file
-    input_file: filename of the seissol input
+    sx: seissolxdmf object
     var_names: list of variables to extract
     time_indices: list of times indices to extract
     reduce_precision: convert double to float and i64 to i32 if True
     backend: data format ("hdf5" or "raw")
     """
-    import seissolxdmf as sx
-
     if backend not in ("hdf5", "raw"):
         raise ValueError(f"Invalid backend {backend}. Must be 'hdf5' or 'raw'.")
     if compression_level < 0 or compression_level > 9:
         raise ValueError("compression_level has to be in 0-9")
-
-    sx = sx.seissolxdmf(input_file)
 
     non_temporal_array_names = ["geometry", "connect"]
     to_move = [name for name in var_names if name in known_1d_arrays]

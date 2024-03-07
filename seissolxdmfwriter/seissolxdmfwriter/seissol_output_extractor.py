@@ -5,6 +5,7 @@ import seissolxdmf
 import seissolxdmfwriter as sxw
 import numpy as np
 import argparse
+from warnings import warn
 
 
 def generate_new_prefix(prefix, append2prefix):
@@ -29,7 +30,7 @@ parser.add_argument(
     "--add2prefix",
     help="string to append to the prefix in the new file",
     type=str,
-    default="_resampled",
+    default="_extracted",
 )
 parser.add_argument(
     "--variables",
@@ -131,6 +132,12 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
         else:
             return super().ReadData(dataName, idt)
 
+    def GetDataLocationPrecisionMemDimension(self, dataName):
+        if dataName == "SR" and "SR" not in self.ReadAvailableDataFields():
+            return super().GetDataLocationPrecisionMemDimension("SRs")
+        else:
+            return super().GetDataLocationPrecisionMemDimension(dataName)
+
 
 def main():
     sx = SeissolxdmfExtended(args.xdmfFilename)
@@ -139,7 +146,7 @@ def main():
     if spatial_filtering:
         xyz = sx.ReadGeometry()
         connect = sx.ReadConnect()
-        print("Warning: spatial filtering significantly slows down this script")
+        warn("spatial filtering significantly slows down this script")
         ids = range(0, sx.nElements)
         xyzc = (
             xyz[connect[:, 0], :] + xyz[connect[:, 1], :] + xyz[connect[:, 2], :]
@@ -182,9 +189,16 @@ def main():
         args.variables = sorted(sx.ReadAvailableDataFields())
         print(f"args.variables was set to all and now contains {args.variables}")
 
+    if args.backend == "hdf5" and args.compression > 0:
+        print(
+            "Writing hdf5 output with compression enabled"
+            f" (compression_level={args.compression}). \n"
+            "Use --compression=0 if you want to speed-up data extraction."
+        )
+
     sxw.write_from_seissol_output(
         prefix_new,
-        args.xdmfFilename,
+        sx,
         args.variables,
         indices,
         reduce_precision=True,

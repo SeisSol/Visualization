@@ -36,7 +36,7 @@ sxw.write(
 
 sxw.write_from_seissol_output(
     'test-fault-sx',
-    fn,
+    sx,
     ['SRs', 'SRd','fault-tag', 'partition'],
     [3,4],
     reduce_precision=True,
