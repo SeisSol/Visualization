@@ -221,7 +221,13 @@ def write_data_from_seissolxdmf(
                     desc=ar_name,
                     dynamic_ncols=False,
                 ):
-                    my_array = sx.ReadData(ar_name, idt)[filtered_cells]
+                    try:
+                        my_array = sx.ReadData(ar_name, idt)[filtered_cells]
+                    except IndexError:
+                        print(
+                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                        )
+                        my_array = np.zeros(nel)
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
@@ -233,7 +239,7 @@ def write_data_from_seissolxdmf(
                         print(
                             f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
                         )
-                        myData = np.zeros(nel)
+                        my_array = np.zeros(nel)
                     h5f[f"/{ar_name}"][i, :] = my_array[:]
         print(f"done writing {prefix}.h5")
     else:
@@ -255,7 +261,7 @@ def write_data_from_seissolxdmf(
                         print(
                             f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
                         )
-                        myData = np.zeros(nel)
+                        my_array = np.zeros(nel)
                     if i == 0:
                         mydtype = output_type(my_array, reduce_precision)
                     my_array[:].astype(mydtype).tofile(fid)
