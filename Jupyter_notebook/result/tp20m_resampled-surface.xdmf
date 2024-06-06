@@ -1,0 +1,34 @@
+<?xml version="1.0" ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="2.0">
+ <Domain>
+  <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
+   <Grid Name="step_000000000012" GridType="Uniform">
+    <Topology TopologyType="Triangle" NumberOfElements="112784">
+     <DataItem NumberType="Int" Precision="8" Format="HDF" Dimensions="112784 3">tp20m_resampled-surface_cell.h5:/mesh0/connect</DataItem>
+    </Topology>
+    <Geometry name="geo" GeometryType="XYZ" NumberOfElements="56727">
+     <DataItem NumberType="Float" Precision="8" Format="HDF" Dimensions="56727 3">tp20m_resampled-surface_vertex.h5:/mesh0/geometry</DataItem>
+    </Geometry>
+    <Time Value="120.000000"/>    <Attribute Name="U" Center="Cell">
+     <DataItem ItemType="HyperSlab" Dimensions="112784">
+      <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">0 0 1 1 1 112784</DataItem>
+      <DataItem NumberType="Float" Precision="4" Format="HDF" Dimensions="1 112784">tp20m_resampled-surface_cell.h5:/mesh0/U</DataItem>
+     </DataItem>
+    </Attribute>
+    <Attribute Name="V" Center="Cell">
+     <DataItem ItemType="HyperSlab" Dimensions="112784">
+      <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">0 0 1 1 1 112784</DataItem>
+      <DataItem NumberType="Float" Precision="4" Format="HDF" Dimensions="1 112784">tp20m_resampled-surface_cell.h5:/mesh0/V</DataItem>
+     </DataItem>
+    </Attribute>
+    <Attribute Name="W" Center="Cell">
+     <DataItem ItemType="HyperSlab" Dimensions="112784">
+      <DataItem NumberType="UInt" Precision="4" Format="XML" Dimensions="3 2">0 0 1 1 1 112784</DataItem>
+      <DataItem NumberType="Float" Precision="4" Format="HDF" Dimensions="1 112784">tp20m_resampled-surface_cell.h5:/mesh0/W</DataItem>
+     </DataItem>
+    </Attribute>
+   </Grid>
+  </Grid>
+ </Domain>
+</Xdmf>
