@@ -50,13 +50,13 @@ def write_timeseries_xdmf(
     xdmf = """<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
- <Domain>"""
+ <Domain>
+  <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">"""
     geometry_location = dataLocation(bn_prefix, "geometry", backend)
     connect_location = dataLocation(bn_prefix, "connect", backend)
 
     for i, ctime in enumerate(timeValues):
         xdmf += f"""
-  <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
    <Grid Name="step_{i}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
      <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
@@ -82,9 +82,9 @@ def write_timeseries_xdmf(
      </DataItem>
     </Attribute>"""
         xdmf += """
-   </Grid>
-  </Grid>"""
+   </Grid>"""
     xdmf += """
+  </Grid>
  </Domain>
 </Xdmf>
 """
