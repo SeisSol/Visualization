@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy", "h5py", ,"seissolxdmf>=0.1.2", "tqdm"
+    "numpy", "h5py" ,"seissolxdmf>=0.1.2", "tqdm"
 ]
 [project.urls]
 Repository = "https://github.com/SeisSol/Visualization/seissolxdmfwriter"
