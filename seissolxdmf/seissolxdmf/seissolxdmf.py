@@ -282,5 +282,5 @@ class seissolxdmf:
             idt = -1
         if firstElement == -1:
             firstElement = 0
-        myData = ReadDataChunk(dataName, firstElement, nElements, idt)
+        myData = self.ReadDataChunk(dataName, firstElement, nElements, idt)
         return [myData, data_prec]
