@@ -277,8 +277,9 @@ def write_data(
     backend,
     compression_level,
 ):
-    time_indices = list(dictTime.values())
-    if not time_indices:
+    if dictTime:
+        time_indices = list(dictTime.values())
+    else:
         time_indices = [0]
     if backend == "hdf5":
         import h5py
