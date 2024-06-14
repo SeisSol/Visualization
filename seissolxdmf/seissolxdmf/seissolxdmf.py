@@ -128,7 +128,7 @@ class seissolxdmf:
                     if path is not None:
                         ref = tree.xpath(path)[0]
                         return get(ref)
-        raise NameError("%s not found in dataset" % (dataName))
+        raise NameError(f"{dataName} not found in dataset, available variables are {self.ReadAvailableDataFields()}")
 
     def ReadTopologyOrGeometry(self, attribute):
         """ Common function to read either connect or geometry """
@@ -282,5 +282,5 @@ class seissolxdmf:
             idt = -1
         if firstElement == -1:
             firstElement = 0
-        myData = ReadDataChunk(dataName, firstElement, nElements, idt)
+        myData = self.ReadDataChunk(dataName, firstElement, nElements, idt)
         return [myData, data_prec]
