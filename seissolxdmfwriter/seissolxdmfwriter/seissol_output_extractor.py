@@ -99,7 +99,8 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
     def ComputeTimeIndices(self, at_time):
         """retrive list of time index in file"""
         outputTimes = np.array(self.ReadTimes())
-        idsReadTimes = list(range(0, len(outputTimes)))
+        nOutputTime = len(outputTimes)
+        idsReadTimes = list(range(0, nOutputTime))
         lidt = []
         for oTime in at_time:
             if not oTime.startswith("i"):
@@ -115,13 +116,16 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
                     startstopstep = [None for i in range(3)]
                     for i, part in enumerate(parts):
                         startstopstep[i] = int(part) if part else None
-                    lidt.extend(
-                        idsReadTimes[
-                            startstopstep[0] : startstopstep[1] : startstopstep[2]
-                        ]
-                    )
+                    new_indices = idsReadTimes[
+                        startstopstep[0] : startstopstep[1] : startstopstep[2]
+                    ]
+                    new_indices = [v for v in new_indices if v < nOutputTime]
+                    if len(new_indices) > 0:
+                        lidt.extend(new_indices)
                 else:
-                    lidt.append(int(sslice))
+                    new_index = int(sslice)
+                    if new_index < nOutputTime:
+                        lidt.append(new_index)
         return sorted(list(set(lidt)))
 
     def ReadData(self, dataName, idt=-1):
