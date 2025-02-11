@@ -21,6 +21,8 @@ def compile_dictDataTypes(dictData, reduce_precision):
     numberTypeDict = {
         "int64": "UInt",
         "int32": "UInt",
+        "uint32": "UInt",
+        "uint64": "UInt",
         "float64": "Float",
         "float32": "Float",
     }
