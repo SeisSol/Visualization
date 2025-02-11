@@ -92,6 +92,13 @@ parser.add_argument(
     help="filter cells with z center coordinates in range zmin zmax",
     type=float,
 )
+parser.add_argument(
+    "--regionFilter",
+    nargs=1,
+    metavar=("comma_separated_tags"),
+    help="filter cells by faultTag (fault output), or locationFlag (surface output)",
+)
+
 args = parser.parse_args()
 
 
@@ -142,46 +149,69 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
         else:
             return super().GetDataLocationPrecisionMemDimension(dataName)
 
+    def GetFilteredCells(self, regionFilter, xRange, yRange, zRange):
+        spatial_filtering = (xRange or yRange) or zRange
+        filter_cells = spatial_filtering or regionFilter
+        if not filter_cells:
+            return slice(None)
+
+        ids = range(0, self.nElements)
+
+        if regionFilter:
+            available = self.ReadAvailableDataFields()
+            if "fault-tag" in available:
+                region_varname = "fault-tag"
+            elif "locationFlag" in available:
+                region_varname = "locationFlag"
+            else:
+                raise ValueError(
+                    f"fault-tag or locationFlag not in available variables {available}"
+                )
+            tags = self.Read1dData(region_varname, self.nElements, isInt=True)
+            regions = regionFilter[0].split(",")
+            try:
+                # Convert to a list of integers
+                regions = [int(region.strip()) for region in regions]
+                print("Regions to filter:", regions)
+            except:
+                raise ValueError(
+                    "Error: All elements in regionFilter must be integers."
+                )
+            ids = [v for v in ids if tags[v] in regions]
+            print(f"cell count after region filtering: {len(ids)}/{self.nElements}")
+
+        if spatial_filtering:
+            xyz = self.ReadGeometry()
+            connect = self.ReadConnect()
+            warn("spatial filtering significantly slows down this script")
+            xyzc = (
+                xyz[connect[:, 0], :] + xyz[connect[:, 1], :] + xyz[connect[:, 2], :]
+            ) / 3.0
+
+            def filter_cells(coords, filter_range):
+                m = 0.5 * (filter_range[0] + filter_range[1])
+                d = 0.5 * (filter_range[1] - filter_range[0])
+                return np.where(np.abs(coords[:] - m) < d)[0]
+
+            if xRange:
+                id0 = filter_cells(xyzc[:, 0], xRange)
+                ids = np.intersect1d(ids, id0)
+            if yRange:
+                id0 = filter_cells(xyzc[:, 1], yRange)
+                ids = np.intersect1d(ids, id0)
+            if zRange:
+                id0 = filter_cells(xyzc[:, 2], zRange)
+                ids = np.intersect1d(ids, id0)
+
+            print(f"cell count after spatial filtering: {len(ids)}/{self.nElements}")
+        if not len(ids):
+            raise ValueError("all elements are outside filter range")
+        return ids
+
 
 def main():
     sx = SeissolxdmfExtended(args.xdmfFilename)
-    spatial_filtering = (args.xRange or args.yRange) or args.zRange
-
-    if spatial_filtering:
-        xyz = sx.ReadGeometry()
-        connect = sx.ReadConnect()
-        warn("spatial filtering significantly slows down this script")
-        ids = range(0, sx.nElements)
-        xyzc = (
-            xyz[connect[:, 0], :] + xyz[connect[:, 1], :] + xyz[connect[:, 2], :]
-        ) / 3.0
-
-        def filter_cells(coords, filter_range):
-            m = 0.5 * (filter_range[0] + filter_range[1])
-            d = 0.5 * (filter_range[1] - filter_range[0])
-            return np.where(np.abs(coords[:] - m) < d)[0]
-
-        if args.xRange:
-            id0 = filter_cells(xyzc[:, 0], args.xRange)
-            ids = np.intersect1d(ids, id0) if len(ids) else id0
-        if args.yRange:
-            id0 = filter_cells(xyzc[:, 1], args.yRange)
-            ids = np.intersect1d(ids, id0) if len(ids) else id0
-        if args.zRange:
-            id0 = filter_cells(xyzc[:, 2], args.zRange)
-            ids = np.intersect1d(ids, id0) if len(ids) else id0
-
-        if len(ids):
-            nElements = ids.shape[0]
-            if nElements != sx.nElements:
-                print(f"extracting {nElements} cells out of {sx.nElements}")
-            else:
-                spatial_filtering = False
-        else:
-            raise ValueError("all elements are outside filter range")
-
-    if not spatial_filtering:
-        ids = slice(None)
+    ids = sx.GetFilteredCells(args.regionFilter, args.xRange, args.yRange, args.zRange)
 
     indices = sx.ComputeTimeIndices(args.time[0].split(","))
 
