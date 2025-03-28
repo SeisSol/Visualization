@@ -217,11 +217,13 @@ def write_data_from_seissolxdmf(
                 my_array = read_non_temporal(sx, ar_name, filtered_cells)
                 write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
             for ar_name in array_names:
-                for i, idt in tqdm(
-                    enumerate(time_indices),
-                    file=sys.stdout,
-                    desc=ar_name,
-                    dynamic_ncols=False,
+                for i, idt in enumerate(
+                    tqdm(
+                        time_indices,
+                        file=sys.stdout,
+                        desc=ar_name,
+                        dynamic_ncols=False,
+                    )
                 ):
                     try:
                         my_array = sx.ReadData(ar_name, idt)[filtered_cells]
@@ -252,11 +254,13 @@ def write_data_from_seissolxdmf(
                 my_array.tofile(fid)
         for ar_name in array_names:
             with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
-                for i, idt in tqdm(
-                    enumerate(time_indices),
-                    file=sys.stdout,
-                    desc=ar_name,
-                    dynamic_ncols=False,
+                for i, idt in enumerate(
+                    tqdm(
+                        time_indices,
+                        file=sys.stdout,
+                        desc=ar_name,
+                        dynamic_ncols=False,
+                    )
                 ):
                     my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if my_array.shape[0] == 0:
