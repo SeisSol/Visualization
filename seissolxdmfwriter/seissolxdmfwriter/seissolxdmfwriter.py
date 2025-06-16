@@ -21,6 +21,8 @@ def compile_dictDataTypes(dictData, reduce_precision):
     numberTypeDict = {
         "int64": "UInt",
         "int32": "UInt",
+        "uint32": "UInt",
+        "uint64": "UInt",
         "float64": "Float",
         "float32": "Float",
     }
@@ -50,13 +52,13 @@ def write_timeseries_xdmf(
     xdmf = """<?xml version="1.0" ?>
 <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
 <Xdmf Version="2.0">
- <Domain>"""
+ <Domain>
+  <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">"""
     geometry_location = dataLocation(bn_prefix, "geometry", backend)
     connect_location = dataLocation(bn_prefix, "connect", backend)
 
     for i, ctime in enumerate(timeValues):
         xdmf += f"""
-  <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
    <Grid Name="step_{i}" GridType="Uniform">
     <Topology TopologyType="{topology}" NumberOfElements="{nCells}">
      <DataItem NumberType="Int" Precision="8" Format="{data_format}" Dimensions="{nCells} {node_per_element}">{connect_location}</DataItem>
@@ -82,9 +84,9 @@ def write_timeseries_xdmf(
      </DataItem>
     </Attribute>"""
         xdmf += """
-   </Grid>
-  </Grid>"""
+   </Grid>"""
     xdmf += """
+  </Grid>
  </Domain>
 </Xdmf>
 """
@@ -215,19 +217,21 @@ def write_data_from_seissolxdmf(
                 my_array = read_non_temporal(sx, ar_name, filtered_cells)
                 write_one_arr_hdf5(h5f, ar_name, my_array, compression_options)
             for ar_name in array_names:
-                for i, idt in tqdm(
-                    enumerate(time_indices),
-                    file=sys.stdout,
-                    desc=ar_name,
-                    dynamic_ncols=False,
+                for i, idt in enumerate(
+                    tqdm(
+                        time_indices,
+                        file=sys.stdout,
+                        desc=ar_name,
+                        dynamic_ncols=False,
+                    )
                 ):
                     try:
                         my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     except IndexError:
                         print(
-                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                            f"time step {idt} of {ar_name} is corrupted, replacing with nans"
                         )
-                        my_array = np.zeros(nel)
+                        my_array = np.full(nel, np.nan)
                     if i == 0:
                         h5f.create_dataset(
                             f"/{ar_name}",
@@ -237,9 +241,9 @@ def write_data_from_seissolxdmf(
                         )
                     if my_array.shape[0] == 0:
                         print(
-                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                            f"time step {idt} of {ar_name} is corrupted, replacing with nans"
                         )
-                        my_array = np.zeros(nel)
+                        my_array = np.full(nel, np.nan)
                     h5f[f"/{ar_name}"][i, :] = my_array[:]
         print(f"done writing {prefix}.h5")
     else:
@@ -250,18 +254,20 @@ def write_data_from_seissolxdmf(
                 my_array.tofile(fid)
         for ar_name in array_names:
             with open(f"{prefix}/{ar_name}.bin", "wb") as fid:
-                for i, idt in tqdm(
-                    enumerate(time_indices),
-                    file=sys.stdout,
-                    desc=ar_name,
-                    dynamic_ncols=False,
+                for i, idt in enumerate(
+                    tqdm(
+                        time_indices,
+                        file=sys.stdout,
+                        desc=ar_name,
+                        dynamic_ncols=False,
+                    )
                 ):
                     my_array = sx.ReadData(ar_name, idt)[filtered_cells]
                     if my_array.shape[0] == 0:
                         print(
-                            f"time step {idt} of {ar_name} is corrupted, replacing with 0s"
+                            f"time step {idt} of {ar_name} is corrupted, replacing with nans"
                         )
-                        my_array = np.zeros(nel)
+                        my_array = np.full(nel, np.nan)
                     if i == 0:
                         mydtype = output_type(my_array, reduce_precision)
                     my_array[:].astype(mydtype).tofile(fid)
@@ -277,8 +283,9 @@ def write_data(
     backend,
     compression_level,
 ):
-    time_indices = list(dictTime.values())
-    if not time_indices:
+    if dictTime:
+        time_indices = list(dictTime.values())
+    else:
         time_indices = [0]
     if backend == "hdf5":
         import h5py

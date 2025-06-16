@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seissolxdmfwriter"
+version = "0.4.3"
+authors = [
+    {name = "SeisSol Group"},
+]
+description = "A python writer for SeisSol xdmf output"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.6"
+keywords = ["SeisSol"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy", "h5py" ,"seissolxdmf>=0.1.2", "tqdm"
+]
+[project.urls]
+Repository = "https://github.com/SeisSol/Visualization/seissolxdmfwriter"
+
+[project.scripts]
+seissol_output_extractor = "seissolxdmfwriter.seissol_output_extractor:main"
