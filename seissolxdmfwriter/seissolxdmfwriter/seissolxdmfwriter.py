@@ -517,13 +517,28 @@ def write_from_seissol_output(
     )
 
     nel = infer_n_elements(sx, filtered_cells)
-    write_timeseries_xdmf(
-        prefix,
-        sx.ReadNNodes(),
-        nel,
-        sx.ReadNodesPerElement(),
-        dictDataTypes,
-        [sx.ReadTimes()[k] for k in time_indices],
-        reduce_precision,
-        backend,
-    )
+    nNodes = sx.ReadNNodes()
+    node_per_element = sx.ReadNodesPerElement()
+    dictTime = [sx.ReadTimes()[k] for k in time_indices]
+
+    if not dictTime:
+        write_mesh_xdmf(
+            prefix,
+            nNodes,
+            nel,
+            node_per_element,
+            dictDataTypes,
+            reduce_precision,
+            backend,
+        )
+    else:
+        write_timeseries_xdmf(
+            prefix,
+            nNodes,
+            nel,
+            node_per_element,
+            dictDataTypes,
+            dictTime,
+            reduce_precision,
+            backend,
+        )

@@ -163,9 +163,11 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
                 region_varname = "fault-tag"
             elif "locationFlag" in available:
                 region_varname = "locationFlag"
+            elif "group" in available:
+                region_varname = "group"
             else:
                 raise ValueError(
-                    f"fault-tag or locationFlag not in available variables {available}"
+                    f"fault-tag, locationFlag or group not in available variables {available}"
                 )
             tags = self.Read1dData(region_varname, self.nElements, isInt=True)
             regions = regionFilter[0].split(",")
