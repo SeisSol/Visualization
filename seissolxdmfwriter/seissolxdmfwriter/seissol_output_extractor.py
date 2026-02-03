@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import os.path
-import seissolxdmf
-import seissolxdmfwriter as sxw
-import numpy as np
-import argparse
 from warnings import warn
+
+import numpy as np
+import seissolxdmf
+
+import seissolxdmfwriter as sxw
 
 
 def generate_new_prefix(prefix, append2prefix):

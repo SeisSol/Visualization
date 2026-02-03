@@ -1,7 +1,8 @@
-import numpy as np
 import os
-from tqdm import tqdm
 import sys
+
+import numpy as np
+from tqdm import tqdm
 
 known_1d_arrays = [
     "locationFlag",
