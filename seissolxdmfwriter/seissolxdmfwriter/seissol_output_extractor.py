@@ -161,21 +161,22 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
 
         if regionFilter:
             available = self.ReadAvailableDataFields()
-            if "fault-tag" in available:
-                region_varname = "fault-tag"
-            elif "locationFlag" in available:
-                region_varname = "locationFlag"
-            elif "group" in available:
-                region_varname = "group"
-            else:
+            possible_varnames = ["fault-tag", "locationFlag", "group"]
+            region_varname = None
+            for candidate in possible_varnames:
+                if candidate in available:
+                    region_varname = candidate
+                    break
+            if region_varname is None:
                 raise ValueError(
-                    f"fault-tag, locationFlag or group not in available variables {available}"
+                    f"None of {possible_varnames} are in available variables {available}"
                 )
+
             tags = self.Read1dData(region_varname, self.nElements, isInt=True)
             regions = regionFilter[0].split(",")
             try:
-                # Convert to a list of integers
-                regions = [int(region.strip()) for region in regions]
+                # Convert to a set of integers
+                regions = set(int(region.strip()) for region in regions)
                 print("Regions to filter:", regions)
             except:
                 raise ValueError(
