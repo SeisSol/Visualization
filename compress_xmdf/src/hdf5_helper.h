@@ -2,7 +2,8 @@
  * @file
  * This file is part of SeisSol.
  *
- * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de, http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
+ * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de,
+ * http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
  *
  * @section LICENSE
  * Copyright (c) 2017, SeisSol Group
@@ -40,21 +41,16 @@
 #ifndef HDF5_HELPER_H
 #define HDF5_HELPER_H
 
-#include <hdf5.h>
-
 #include "utils/logger.h"
 
-template<typename T>
-static void checkH5Err(T status)
-{
-	if (status < 0)
-		logError() << "An HDF5 error occurred";
+#include <hdf5.h>
+
+template <typename T>
+static void checkH5Err(T status) {
+  if (status < 0)
+    logError() << "An HDF5 error occurred";
 }
 
-inline
-static hsize_t sizeofType(hid_t type)
-{
-	return H5Tget_size(type);
-}
+inline static hsize_t sizeofType(hid_t type) { return H5Tget_size(type); }
 
 #endif // HDF5_HELPER_H

@@ -6,6 +6,6 @@
 #include <utility>
 #include <vector>
 
-std::pair<std::vector<int>, std::vector<Sample>> read(char const* file_name);
+std::pair<std::vector<int>, std::vector<Sample>> read(const char* file_name);
 
 #endif // TRACE_20201125_H
