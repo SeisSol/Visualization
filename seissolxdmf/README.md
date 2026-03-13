@@ -1,7 +1,9 @@
 seissolxdmf
 ===============
+
 A python reader for SeisSol xdmf output (posix or hdf5) and hdf5 meshes.
 Below is an simple example, illustrating the use of the module:
+
 ```python
 import seissolxdmf
 fn = 'test-fault.xdmf'

@@ -12,4 +12,3 @@ target_link_libraries(trace PRIVATE ${NETCDF_LIBRARIES}
                                     ${HDF5_HL_LIBRARIES}
                                     ${HDF5_C_LIBRARIES}
                                     MPI::MPI_CXX)
-

@@ -2,8 +2,10 @@
  * @file
  * This file is part of SeisSol.
  *
- * @author Carsten Uphoff (c.uphoff AT tum.de, http://www5.in.tum.de/wiki/index.php/Carsten_Uphoff,_M.Sc.)
- * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de, http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
+ * @author Carsten Uphoff (c.uphoff AT tum.de,
+ * http://www5.in.tum.de/wiki/index.php/Carsten_Uphoff,_M.Sc.)
+ * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de,
+ * http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
  *
  * @section LICENSE
  * Copyright (c) 2016, SeisSol Group
@@ -53,107 +55,97 @@ union Point {
     double z;
   };
 
-  bool operator==(const Point& other) const {
-	return x == other.x & y == other.y & z == other.z;
-  }
+  bool operator==(const Point& other) const { return x == other.x & y == other.y & z == other.z; }
 };
 
 // a little helper that should IMHO be standardized
-template<typename T>
-std::size_t make_hash(const T& v)
-{
-	return std::hash<T>()(v);
+template <typename T>
+std::size_t make_hash(const T& v) {
+  return std::hash<T>()(v);
 }
 
 // adapted from boost::hash_combine
-inline void hash_combine(std::size_t& h, const std::size_t& v)
-{
-	h ^= v + 0x9e3779b9 + (h << 6) + (h >> 2);
+inline void hash_combine(std::size_t& h, const std::size_t& v) {
+  h ^= v + 0x9e3779b9 + (h << 6) + (h >> 2);
 }
 
-namespace std
-{
+namespace std {
 
 // support for Point
-template<>
-struct hash<Point>
-{
-	size_t operator()(const Point& v) const
-	{
-		size_t x = make_hash(v.x);
-		size_t y = make_hash(v.y);
-		size_t z = make_hash(v.z);
-		hash_combine(x, y);
-		hash_combine(x, z);
-		return x;
-	}
+template <>
+struct hash<Point> {
+  size_t operator()(const Point& v) const {
+    size_t x = make_hash(v.x);
+    size_t y = make_hash(v.y);
+    size_t z = make_hash(v.z);
+    hash_combine(x, y);
+    hash_combine(x, z);
+    return x;
+  }
 };
 
-}
+} // namespace std
 
 class KDTree {
-public:
-	/**
-	 * @param split The dimensions that should be used for spliting.
-	 *  At least one of the 3 values has to be true.
-	 */
-	KDTree(std::unordered_set<Point> const& points, int maxLeafSize,
-		bool split[3]);
-	~KDTree();
+  public:
+  /**
+   * @param split The dimensions that should be used for spliting.
+   *  At least one of the 3 values has to be true.
+   */
+  KDTree(const std::unordered_set<Point>& points, int maxLeafSize, bool split[3]);
+  ~KDTree();
 
-	template<typename Support, typename Action>
-	void search(Support const& support, Action& action) const
-	{
-		searchTree<Support, Action>(0, support, action);
-	}
+  template <typename Support, typename Action>
+  void search(const Support& support, Action& action) const {
+    searchTree<Support, Action>(0, support, action);
+  }
 
-	inline Point const* points() const { return data; }
-	inline int index(int r) const { return idx[r]; }
-  inline int numPoints() const { return nodes[0].n;}
+  inline const Point* points() const { return data; }
+  inline int index(int r) const { return idx[r]; }
+  inline int numPoints() const { return nodes[0].n; }
 
-private:
-	int leftChild(int k) const { return 2*k + 1; }
-	int rightChild(int k) const { return 2*k + 2; }
+  private:
+  int leftChild(int k) const { return 2 * k + 1; }
+  int rightChild(int k) const { return 2 * k + 2; }
 
-	struct Node {
+  struct Node {
     Node() : isLeaf(false) {}
-		double pivot;
-		int start;
-		int n;
-		int splitdim;
-		bool isLeaf;
-	};
-	Node* nodes;
+    double pivot;
+    int start;
+    int n;
+    int splitdim;
+    bool isLeaf;
+  };
+  Node* nodes;
 
-	void swap(int i, int j);
-	int partition(int left, int right, int pivotIdx, int splitdim);
-	void buildTree(int k, int splitdim);
+  void swap(int i, int j);
+  int partition(int left, int right, int pivotIdx, int splitdim);
+  void buildTree(int k, int splitdim);
 
-	template<typename Support, typename Action>
-	void searchTree(int k, Support const& support, Action& action) const;
+  template <typename Support, typename Action>
+  void searchTree(int k, const Support& support, Action& action) const;
 
-	Point* data;
-	int* idx;
-	bool split[3];
-	int maxLeafN;
+  Point* data;
+  int* idx;
+  bool split[3];
+  int maxLeafN;
 };
 
-template<typename Support, typename Action>
-void KDTree::searchTree(int k, Support const& support, Action& action) const
-{
-	Node& node = nodes[k];
-	if (node.isLeaf) {
-		for (int i = node.start; i < node.start + node.n; ++i) {
+template <typename Support, typename Action>
+void KDTree::searchTree(int k, const Support& support, Action& action) const {
+  Node& node = nodes[k];
+  if (node.isLeaf) {
+    for (int i = node.start; i < node.start + node.n; ++i) {
       action(data[i]);
-		}
-	} else {
-		if (support(node.splitdim, 0) <= node.pivot) {
-			searchTree<Support, Action>(leftChild(k), support, action);
-		}
-		if (support(node.splitdim, 1) >= node.pivot) {
-			searchTree<Support, Action>(rightChild(k), support, action);
-		}
-	}
+    }
+  } else {
+    if (support(node.splitdim, 0) <= node.pivot) {
+      searchTree<Support, Action>(leftChild(k), support, action);
+    }
+    if (support(node.splitdim, 1) >= node.pivot) {
+      searchTree<Support, Action>(rightChild(k), support, action);
+    }
+  }
 }
 
 #endif

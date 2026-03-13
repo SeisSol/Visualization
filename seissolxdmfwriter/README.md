@@ -1,5 +1,6 @@
 seissolxdmfwriter
 =================
+
 A python module to write seissol outputs readable by paraview.
 
 ```python
@@ -8,7 +9,9 @@ import seissolxdmf as sx
 import numpy as np
 
 fn = "test-fault.xdmf"
+
 # Read data from input file using seissolxdmf
+
 sx = sx.seissolxdmf(fn)
 geom = sx.ReadGeometry()
 connect = sx.ReadConnect()
@@ -31,8 +34,8 @@ sxw.write(
     backend="hdf5",
 )
 
-# Finally, the module can be use to write data directly from seissolxdmf, limiting
-# the memory requirements
+# Finally, the module can be use to write data directly from seissolxdmf,
+# limiting the memory requirements
 
 sxw.write_from_seissol_output(
     'test-fault-sx',
@@ -46,11 +49,22 @@ sxw.write_from_seissol_output(
 
 ```
 
-The module also encapsulates `seissol_output_extractor`, which can be used to extract and process data from SeisSol output files, allowing selection of variables, time steps, spatial ranges, and output format.
+The module also encapsulates `seissol_output_extractor`,
+which can be used to extract and process data from SeisSol
+output files, allowing selection of variables, time steps,
+spatial ranges, and output format.
 Here is an example of use:
 
 ```bash
-# extracts PSR, Vr and partition, at 2nd and 4th time steps and at simulation time 0.5, from test-fault.xdmf and write into test_new-fault.xdmf
-# use seissol_output_extractor --h for additionnal info about the arguments
-seissol_output_extractor test-fault.xdmf --time "i2,i4,0.5" --variable PSR Vr partition --add2prefix "_new"
+# extracts PSR, Vr and partition, at 2nd and 4th time
+# steps and at simulation time 0.5, from test-fault.xdmf
+# and write into test_new-fault.xdmf
+#
+# use seissol_output_extractor --h for additionnal
+# info about the arguments
+
+seissol_output_extractor test-fault.xdmf \
+    --time "i2,i4,0.5" \
+    --variable PSR Vr partition \
+    --add2prefix "_new"
 ```

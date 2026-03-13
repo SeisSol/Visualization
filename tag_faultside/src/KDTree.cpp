@@ -2,8 +2,10 @@
  * @file
  * This file is part of SeisSol.
  *
- * @author Carsten Uphoff (c.uphoff AT tum.de, http://www5.in.tum.de/wiki/index.php/Carsten_Uphoff,_M.Sc.)
- * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de, http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
+ * @author Carsten Uphoff (c.uphoff AT tum.de,
+ * http://www5.in.tum.de/wiki/index.php/Carsten_Uphoff,_M.Sc.)
+ * @author Sebastian Rettenberger (sebastian.rettenberger AT tum.de,
+ * http://www5.in.tum.de/wiki/index.php/Sebastian_Rettenberger)
  *
  * @section LICENSE
  * Copyright (c) 2016, SeisSol Group
@@ -41,108 +43,102 @@
 #include "KDTree.h"
 
 #include <algorithm>
-#include <cstring>
 #include <cmath>
+#include <cstring>
 
-KDTree::KDTree(std::unordered_set<Point> const& points, int maxLeafSize, bool split[3])
-	: maxLeafN(maxLeafSize)
-{
-	memcpy(this->split, split, sizeof(bool)*3);
+KDTree::KDTree(const std::unordered_set<Point>& points, int maxLeafSize, bool split[3])
+    : maxLeafN(maxLeafSize) {
+  memcpy(this->split, split, sizeof(bool) * 3);
 
-	int n = points.size();
+  int n = points.size();
 
-	// Copy data and change row-major to column-major storage.
-	data = new Point[n];
-	Point* next = data;
-	for (std::unordered_set<Point>::const_iterator it = points.begin();
-			it != points.end(); it++) {
-		memcpy(next->coords, it->coords, sizeof(double)*3);
-		next++;
-	}
+  // Copy data and change row-major to column-major storage.
+  data = new Point[n];
+  Point* next = data;
+  for (std::unordered_set<Point>::const_iterator it = points.begin(); it != points.end(); it++) {
+    memcpy(next->coords, it->coords, sizeof(double) * 3);
+    next++;
+  }
 
-	idx = new int[n];
-	for (int i = 0; i < n; ++i) {
-		idx[i] = i;
-	}
+  idx = new int[n];
+  for (int i = 0; i < n; ++i) {
+    idx[i] = i;
+  }
 
-	int maxHeight = 1 + ceil(log2(n / static_cast<double>(maxLeafN)));
-	int maxNodes = (1 << maxHeight) - 1;
-	nodes = new Node[maxNodes];
-	nodes[0].start = 0;
-	nodes[0].n = n;
+  int maxHeight = 1 + ceil(log2(n / static_cast<double>(maxLeafN)));
+  int maxNodes = (1 << maxHeight) - 1;
+  nodes = new Node[maxNodes];
+  nodes[0].start = 0;
+  nodes[0].n = n;
 
-	buildTree(0, 0);
+  buildTree(0, 0);
 }
 
-KDTree::~KDTree()
-{
-	delete[] data;
-	delete[] idx;
-	delete[] nodes;
+KDTree::~KDTree() {
+  delete[] data;
+  delete[] idx;
+  delete[] nodes;
 }
 
-void KDTree::swap(int i, int j)
-{
-	if (i != j) {
-		std::swap(idx[i], idx[j]);
+void KDTree::swap(int i, int j) {
+  if (i != j) {
+    std::swap(idx[i], idx[j]);
     std::swap(data[i], data[j]);
-	}
+  }
 }
 
-int KDTree::partition(int left, int right, int pivotIdx, int splitdim)
-{
-	double pivot = data[pivotIdx].coords[splitdim];
-	int st = left;
-	for (int i = left; i < right; ++i) {
-		if (data[i].coords[splitdim] < pivot) {
-			swap(st, i);
-			++st;
-		}
-	}
-	swap(st, right);
-	return st;
+int KDTree::partition(int left, int right, int pivotIdx, int splitdim) {
+  double pivot = data[pivotIdx].coords[splitdim];
+  int st = left;
+  for (int i = left; i < right; ++i) {
+    if (data[i].coords[splitdim] < pivot) {
+      swap(st, i);
+      ++st;
+    }
+  }
+  swap(st, right);
+  return st;
 }
 
-void KDTree::buildTree(int k, int splitdim)
-{
-	Node& node = nodes[k];
-	node.splitdim = splitdim;
-	if (node.n > maxLeafN) {
-		int half = (node.n % 2 != 0) ? (node.n + 1)/2 : node.n/2;
-		int l = node.start;
-		int r = l + node.n - 1;
-		int median_idx = l + half;
-		if (l != r) {
-			int pivotIdx;
-			while (true) {
-				pivotIdx = r;
-				pivotIdx = partition(l, r, pivotIdx, splitdim);
-				if (median_idx == pivotIdx) {
-					break;
-				} else if (median_idx < pivotIdx) {
-					r = pivotIdx - 1;
-				} else {
-					l = pivotIdx + 1;
-				}
-			}
-		}
-		node.pivot = data[median_idx].coords[splitdim];
+void KDTree::buildTree(int k, int splitdim) {
+  Node& node = nodes[k];
+  node.splitdim = splitdim;
+  if (node.n > maxLeafN) {
+    int half = (node.n % 2 != 0) ? (node.n + 1) / 2 : node.n / 2;
+    int l = node.start;
+    int r = l + node.n - 1;
+    int median_idx = l + half;
+    if (l != r) {
+      int pivotIdx;
+      while (true) {
+        pivotIdx = r;
+        pivotIdx = partition(l, r, pivotIdx, splitdim);
+        if (median_idx == pivotIdx) {
+          break;
+        } else if (median_idx < pivotIdx) {
+          r = pivotIdx - 1;
+        } else {
+          l = pivotIdx + 1;
+        }
+      }
+    }
+    node.pivot = data[median_idx].coords[splitdim];
 
-		Node& left = nodes[leftChild(k)];
-		left.start = node.start;
-		left.n = half;
+    Node& left = nodes[leftChild(k)];
+    left.start = node.start;
+    left.n = half;
 
-		Node& right = nodes[rightChild(k)];
-		right.start = median_idx;
-		right.n = node.n - half;
+    Node& right = nodes[rightChild(k)];
+    right.start = median_idx;
+    right.n = node.n - half;
 
-		int nextSplitdim = splitdim;
-		do {
-			nextSplitdim = (nextSplitdim + 1) % 3;
-		} while (!split[nextSplitdim]);
-		buildTree(leftChild(k), nextSplitdim);
-		buildTree(rightChild(k), nextSplitdim);
-	} else {
-		node.isLeaf = true;
-	}
+    int nextSplitdim = splitdim;
+    do {
+      nextSplitdim = (nextSplitdim + 1) % 3;
+    } while (!split[nextSplitdim]);
+    buildTree(leftChild(k), nextSplitdim);
+    buildTree(rightChild(k), nextSplitdim);
+  } else {
+    node.isLeaf = true;
+  }
 }

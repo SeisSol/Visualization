@@ -55,7 +55,7 @@ class seissolxdmf:
 
     def ReadSimpleBinaryFile(self, absolute_path, MemDimension, data_prec, isInt, idt=-1):
         """Read block of data in binary format (posix)
-        idt!=-1 loads only one time step 
+        idt!=-1 loads only one time step
         this function is a special case of ReadSimpleBinaryFileChunk
         but kept for performance reasons """
         oneDtMem = True if idt != -1 else False
