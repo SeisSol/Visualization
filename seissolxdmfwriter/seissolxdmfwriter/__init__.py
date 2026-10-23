@@ -1,4 +1,5 @@
 from .seissolxdmfwriter import *
+from .write_vtkhdf_from_seissol_output import write_vtkhdf_from_seissol_output
 
 try:
     from importlib.metadata import PackageNotFoundError, version
