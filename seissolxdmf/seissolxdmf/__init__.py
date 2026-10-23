@@ -1,4 +1,7 @@
-from .seissolxdmf import *
+from .base import SeisSolReaderBase
+from .seissolxdmf import seissolxdmf
+from .vtkhdf import VTKHDFReader, VTKHDFSeries
+
 try:
     from importlib.metadata import version, PackageNotFoundError
 except ImportError:

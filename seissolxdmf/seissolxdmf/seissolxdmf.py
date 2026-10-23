@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import xml.etree.ElementTree as ET
+from .base import SeisSolReaderBase
+
 
 def find_line_number_endtag_xdmf(alines):
     for n, line in enumerate(alines):
@@ -8,7 +10,7 @@ def find_line_number_endtag_xdmf(alines):
           return n + 1
     raise ValueError("</Xdmf> not found")
 
-class seissolxdmf:
+class seissolxdmf(SeisSolReaderBase):
     def __init__(self, xdmfFilename):
         self.xdmfFilename = xdmfFilename
         with open (xdmfFilename, "r") as fid:
