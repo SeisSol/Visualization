@@ -9,6 +9,12 @@ import seissolxdmf
 
 import seissolxdmfwriter as sxw
 
+import posixpath
+import xml.etree.ElementTree as ET
+from concurrent.futures import ProcessPoolExecutor
+
+import h5py
+
 
 def generate_new_prefix(prefix, append2prefix):
     prefix = os.path.basename(prefix)
@@ -101,7 +107,12 @@ parser.add_argument(
     help="filter cells by faultTag (fault output), or locationFlag (surface output)",
 )
 
-args = parser.parse_args()
+parser.add_argument(
+    "--jobs",
+    type=int,
+    default=1,
+    help="number of worker processes (variables are split among them)",
+)
 
 
 class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
@@ -214,19 +225,72 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
         return ids
 
 
+def _extract_chunk(part_prefix, xdmf_filename, variables, indices, ids,
+                   backend, compression):
+    # each worker opens its own file handle; compression happens here, in parallel
+    sx = SeissolxdmfExtended(xdmf_filename)
+    sxw.write_from_seissol_output(
+        part_prefix, sx, variables, indices,
+        reduce_precision=True,
+        backend=backend,
+        compression_level=compression,
+        filtered_cells=ids,
+    )
+    return part_prefix
+
+
+def _merge_h5(part_prefixes, final_prefix):
+    # copies already-compressed datasets, so nothing is recompressed
+    with h5py.File(final_prefix + ".h5", "w") as out:
+        for p in part_prefixes:
+            with h5py.File(p + ".h5", "r") as src:
+                def copy_new(name, obj):
+                    # geometry/connectivity exist in every part: keep the first copy
+                    if isinstance(obj, h5py.Dataset) and name not in out:
+                        parent = posixpath.dirname(name)
+                        if parent:
+                            out.require_group(parent)
+                        src.copy(obj, out, name=name)
+                src.visititems(copy_new)
+            os.remove(p + ".h5")
+
+
+def _merge_xdmf(part_prefixes, final_prefix, merge_h5):
+    trees = [ET.parse(p + ".xdmf") for p in part_prefixes]
+    base = trees[0]
+    base_grids = base.getroot().findall(".//Grid[@GridType='Uniform']")
+    for other in trees[1:]:
+        other_grids = other.getroot().findall(".//Grid[@GridType='Uniform']")
+        for g_base, g_other in zip(base_grids, other_grids):
+            for attr in g_other.findall("Attribute"):
+                g_base.append(attr)
+
+    if merge_h5:
+        # point DataItems from the part files to the merged file
+        final_h5 = os.path.basename(final_prefix) + ".h5"
+        for item in base.getroot().iter("DataItem"):
+            if item.text:
+                for p in part_prefixes:
+                    item.text = item.text.replace(os.path.basename(p) + ".h5", final_h5)
+
+    base.write(final_prefix + ".xdmf")
+    for p in part_prefixes:
+        os.remove(p + ".xdmf")
+
+
 def main():
+    args = parser.parse_args()
     sx = SeissolxdmfExtended(args.xdmfFilename)
     ids = sx.GetFilteredCells(args.regionFilter, args.xRange, args.yRange, args.zRange)
-
     indices = sx.ComputeTimeIndices(args.time[0].split(","))
-
     prefix = os.path.splitext(args.xdmfFilename)[0]
     prefix_new = generate_new_prefix(prefix, args.add2prefix)
 
-    # Write data items
     if args.variables[0] == "all":
-        args.variables = sorted(sx.ReadAvailableDataFields())
-        print(f"args.variables was set to all and now contains {args.variables}")
+        variables = sorted(sx.ReadAvailableDataFields())
+        print(f"args.variables was set to all and now contains {variables}")
+    else:
+        variables = args.variables
 
     if args.backend == "hdf5" and args.compression > 0:
         print(
@@ -235,16 +299,19 @@ def main():
             "Use --compression=0 if you want to speed-up data extraction."
         )
 
-    sxw.write_from_seissol_output(
-        prefix_new,
-        sx,
-        args.variables,
-        indices,
-        reduce_precision=True,
-        backend=args.backend,
-        compression_level=args.compression,
-        filtered_cells=ids,
-    )
+    n = max(1, min(args.jobs, len(variables)))
+    chunks = [variables[i::n] for i in range(n)]
+    part_prefixes = [f"{prefix_new}.part{i}" for i in range(n)]
+
+    with ProcessPoolExecutor(max_workers=n) as ex:
+        list(ex.map(_extract_chunk, part_prefixes,
+                    [args.xdmfFilename] * n, chunks, [indices] * n, [ids] * n,
+                    [args.backend] * n, [args.compression] * n))
+
+    is_hdf5 = args.backend == "hdf5"
+    if is_hdf5:
+        _merge_h5(part_prefixes, prefix_new)
+    _merge_xdmf(part_prefixes, prefix_new, merge_h5=is_hdf5)
 
 
 if __name__ == "__main__":
