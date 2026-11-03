@@ -226,12 +226,12 @@ class SeissolxdmfExtended(seissolxdmf.seissolxdmf):
 
 
 def _extract_chunk(part_prefix, xdmf_filename, variables, indices, ids,
-                   backend, compression):
+                   backend, compression, reduce_precision):
     # each worker opens its own file handle; compression happens here, in parallel
     sx = SeissolxdmfExtended(xdmf_filename)
     sxw.write_from_seissol_output(
         part_prefix, sx, variables, indices,
-        reduce_precision=True,
+        reduce_precision=reduce_precision,
         backend=backend,
         compression_level=compression,
         filtered_cells=ids,
@@ -259,8 +259,12 @@ def _merge_xdmf(part_prefixes, final_prefix, merge_h5):
     trees = [ET.parse(p + ".xdmf") for p in part_prefixes]
     base = trees[0]
     base_grids = base.getroot().findall(".//Grid[@GridType='Uniform']")
+    if not base_grids:
+        raise RuntimeError("no Uniform grids found in xdmf, cannot merge")
     for other in trees[1:]:
         other_grids = other.getroot().findall(".//Grid[@GridType='Uniform']")
+        if len(other_grids) != len(base_grids):
+            raise RuntimeError("time step count differs between part files")
         for g_base, g_other in zip(base_grids, other_grids):
             for attr in g_other.findall("Attribute"):
                 g_base.append(attr)
@@ -285,6 +289,7 @@ def main():
     indices = sx.ComputeTimeIndices(args.time[0].split(","))
     prefix = os.path.splitext(args.xdmfFilename)[0]
     prefix_new = generate_new_prefix(prefix, args.add2prefix)
+    reduce_precision = args.precision == "float"
 
     if args.variables[0] == "all":
         variables = sorted(sx.ReadAvailableDataFields())
@@ -300,18 +305,38 @@ def main():
         )
 
     n = max(1, min(args.jobs, len(variables)))
-    chunks = [variables[i::n] for i in range(n)]
-    part_prefixes = [f"{prefix_new}.part{i}" for i in range(n)]
 
-    with ProcessPoolExecutor(max_workers=n) as ex:
-        list(ex.map(_extract_chunk, part_prefixes,
-                    [args.xdmfFilename] * n, chunks, [indices] * n, [ids] * n,
-                    [args.backend] * n, [args.compression] * n))
+    if n == 1:
+        # Keep the original serial execution path: no subprocesses,
+        # temporary files, or merge step.
+        sxw.write_from_seissol_output(
+            prefix_new, sx, variables, indices,
+            reduce_precision=reduce_precision,
+            backend=args.backend,
+            compression_level=args.compression,
+            filtered_cells=ids,
+        )
+    else:
+        chunks = [variables[i::n] for i in range(n)]
+        part_prefixes = [f"{prefix_new}.part{i}" for i in range(n)]
 
-    is_hdf5 = args.backend == "hdf5"
-    if is_hdf5:
-        _merge_h5(part_prefixes, prefix_new)
-    _merge_xdmf(part_prefixes, prefix_new, merge_h5=is_hdf5)
+        with ProcessPoolExecutor(max_workers=n) as ex:
+            list(ex.map(
+                _extract_chunk,
+                part_prefixes,
+                [args.xdmfFilename] * n,
+                chunks,
+                [indices] * n,
+                [ids] * n,
+                [args.backend] * n,
+                [args.compression] * n,
+                [reduce_precision] * n,
+            ))
+
+        is_hdf5 = args.backend == "hdf5"
+        if is_hdf5:
+            _merge_h5(part_prefixes, prefix_new)
+        _merge_xdmf(part_prefixes, prefix_new, merge_h5=is_hdf5)
 
 
 if __name__ == "__main__":
