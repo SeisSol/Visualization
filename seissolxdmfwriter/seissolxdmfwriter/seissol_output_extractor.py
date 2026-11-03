@@ -269,13 +269,16 @@ def _merge_h5(part_prefixes, final_prefix):
 
 def _merge_raw(part_prefixes, final_prefix):
     # the raw backend writes one directory per prefix, containing the .bin files
-    os.makedirs(final_prefix, exist_ok=True)
+    if os.path.exists(final_prefix):
+        shutil.rmtree(final_prefix)
+
+    os.makedirs(final_prefix)
+
     for p in part_prefixes:
         for fn in os.listdir(p):
             dst = os.path.join(final_prefix, fn)
-            if os.path.exists(dst):
-                continue  # geometry.bin / connect.bin are the same in every part
-            shutil.move(os.path.join(p, fn), dst)
+            if not os.path.exists(dst):
+                shutil.move(os.path.join(p, fn), dst)
         shutil.rmtree(p)
 
 
