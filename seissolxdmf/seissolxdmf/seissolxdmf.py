@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import xml.etree.ElementTree as ET
+from .base import SeisSolReaderBase
+
 
 def find_line_number_endtag_xdmf(alines):
     for n, line in enumerate(alines):
@@ -8,7 +10,7 @@ def find_line_number_endtag_xdmf(alines):
           return n + 1
     raise ValueError("</Xdmf> not found")
 
-class seissolxdmf:
+class seissolxdmf(SeisSolReaderBase):
     def __init__(self, xdmfFilename):
         self.xdmfFilename = xdmfFilename
         with open (xdmfFilename, "r") as fid:
@@ -61,7 +63,7 @@ class seissolxdmf:
         oneDtMem = True if idt != -1 else False
         data_type = self.GetDtype(data_prec, isInt)
 
-        fid = open(absolute_path, "r")
+        fid = open(absolute_path, "rb")
         if oneDtMem:
             fid.seek(idt * MemDimension * data_prec, os.SEEK_SET)
             myData = np.fromfile(fid, dtype=data_type, count=MemDimension)
@@ -79,13 +81,13 @@ class seissolxdmf:
         oneDtMem = True if idt != -1 else False
         data_type = self.GetDtype(data_prec, isInt)
 
-        fid = open(absolute_path, "r")
+        fid = open(absolute_path, "rb")
         if oneDtMem:
             assert idt < self.ndt, f"{idt} < {self.ndt}"
             fid.seek((idt * MemDimension + firstElement) * data_prec, os.SEEK_SET)
             myData = np.fromfile(fid, dtype=data_type, count=nchunk)
         else:
-            myData = np.zeros((self.ndt, nchunk))
+            myData = np.zeros((self.ndt, nchunk), dtype=data_type)
             for idt in range(0, self.ndt):
                 fid.seek((idt * MemDimension + firstElement) * data_prec, os.SEEK_SET)
                 myData[idt, :] = np.fromfile(fid, dtype=data_type, count=nchunk)
@@ -124,10 +126,6 @@ class seissolxdmf:
                 for prop in Property.findall(".//DataItem"):
                     if prop.get("Format") in ["HDF", "Binary"]:
                         return get(prop)
-                    path = prop.get("Reference")
-                    if path is not None:
-                        ref = tree.xpath(path)[0]
-                        return get(ref)
         raise NameError(f"{dataName} not found in dataset, available variables are {self.ReadAvailableDataFields()}")
 
     def ReadTopologyOrGeometry(self, attribute):
@@ -180,12 +178,7 @@ class seissolxdmf:
         root = self.tree.getroot()
         for location in list_possible_location:
             for Property in root.findall(location):
-                path = Property.get("Reference")
-                if not path:
-                    return Property.get(attribute)
-                else:
-                    ref = tree.xpath(path)[0]
-                    return ref.get(attribute)
+                return Property.get(attribute)
         raise NameError(f"{attribute} not found in {list_possible_location}")
 
     def ReadNElements(self):
