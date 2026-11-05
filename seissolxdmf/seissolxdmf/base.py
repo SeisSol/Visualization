@@ -12,9 +12,15 @@ class SeisSolReaderBase:
         indices = []
         for t in at_time:
             if not t.startswith("i"):
-                close = np.flatnonzero(np.isclose(output_times, float(t), atol=1e-4))
+                target = float(t)
+                close = np.flatnonzero(
+                    np.isclose(output_times, target, rtol=0, atol=1e-4)
+                )
                 if close.size:
-                    indices.append(int(close[0]))
+                    best = close_indices[
+                        np.argmin(np.abs(output_times[close_indices] - target))
+                    ]
+                    time_indices.add(int(best))
                 else:
                     print(f"t={t} not found in {self.xdmfFilename}")
             else:
